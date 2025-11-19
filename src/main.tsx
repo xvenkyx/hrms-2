@@ -12,6 +12,7 @@ import Settings from "@/pages/Settings"
 import GenerateSlip from "@/pages/GenerateSlip"
 
 import "./index.css"
+import SalaryHistory from "./pages/SalaryHistory"
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
@@ -24,6 +25,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="bonus" element={<Bonus />} />
           <Route path="settings" element={<Settings />} />
           <Route path="generate-slip" element={<GenerateSlip />} />
+          <Route path="salary-history" element={<SalaryHistory />} />
         </Route>
       </Routes>
     </BrowserRouter>

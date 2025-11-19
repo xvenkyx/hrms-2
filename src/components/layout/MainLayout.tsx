@@ -1,8 +1,8 @@
-import { Link, Outlet, useLocation } from "react-router-dom"
-import { cn } from "@/lib/utils"
+import { Link, Outlet, useLocation } from "react-router-dom";
+import { cn } from "@/lib/utils";
 
 export default function MainLayout() {
-  const location = useLocation()
+  const location = useLocation();
 
   const menu = [
     { name: "Dashboard", path: "/" },
@@ -11,7 +11,9 @@ export default function MainLayout() {
     { name: "Performance Bonus", path: "/bonus" },
     { name: "Settings", path: "/settings" },
     { name: "Generate Slip", path: "/generate-slip" },
-  ]
+    // In the menu array, add:
+    { name: "Salary History", path: "/salary-history" },
+  ];
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -38,5 +40,5 @@ export default function MainLayout() {
         <Outlet />
       </main>
     </div>
-  )
+  );
 }

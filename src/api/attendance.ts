@@ -9,6 +9,7 @@ export async function saveAttendance(data: {
   employeeId: string;
   yearMonth: string;
   absentDays: number;
+  leaveMode?: string;
 }) {
   const res = await fetch(`${API_BASE}/attendance`, {
     method: "POST",
