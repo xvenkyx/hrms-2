@@ -1,185 +1,109 @@
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 
 export function generateSalaryPDF(slip: any) {
   const doc = new jsPDF();
-  
-  // Colors as tuples to satisfy TypeScript
-  const primaryColor: [number, number, number] = [41, 128, 185]; // Blue
-  const darkColor: [number, number, number] = [44, 62, 80];      // Dark
-  const lightGray: [number, number, number] = [248, 249, 250];   // Light gray
-  const white: [number, number, number] = [255, 255, 255];       // White
 
-  // Company Header
-  doc.setFillColor(...primaryColor);
-  doc.rect(0, 0, 210, 20, 'F');
-  
-  doc.setTextColor(...white);
-  doc.setFontSize(16);
-  doc.setFont('helvetica', 'bold');
-  doc.text('JHEX CONSULTING LLP', 105, 12, { align: 'center' });
-  
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.text('SALARY SLIP', 105, 17, { align: 'center' });
+  const W = doc.internal.pageSize.getWidth();
+  const H = doc.internal.pageSize.getHeight();
 
-  // Employee and Period Information
-  doc.setTextColor(...darkColor);
+  const format = (amount: number) =>
+    (amount || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+  // OUTER BORDER
+  doc.setLineWidth(0.7);
+  doc.rect(8, 8, W - 16, H - 16);
+
+  // HEADER
+  doc.setFontSize(15).setFont("helvetica", "bold");
+  doc.text("JHEX CONSULTING LLP", W / 2, 22, { align: "center" });
+
+  doc.setFontSize(10).setFont("helvetica", "normal");
+  doc.text("SALARY SLIP", W / 2, 28, { align: "center" });
+
+  doc.setLineWidth(0.4);
+  doc.line(12, 32, W - 12, 32);
+
+  // EMPLOYEE INFO + DAYS INFO
   doc.setFontSize(9);
-  
-  // Left side - Employee info
-  doc.text(`Employee: ${slip.employeeName}`, 14, 30);
-  doc.text(`ID: ${slip.employeeId}`, 14, 35);
-  doc.text(`Department: ${slip.department}`, 14, 40);
-  
-  // Right side - Period info
-  doc.text(`Period: ${slip.yearMonth}`, 160, 30, { align: 'right' });
-  doc.text(`Generated: ${new Date().toLocaleDateString()}`, 160, 35, { align: 'right' });
-  doc.text(`Designation: ${slip.role}`, 160, 40, { align: 'right' });
+  doc.text(`Employee: ${slip.employeeName}`, 12, 40);
+  doc.text(`ID: ${slip.employeeId}`, 12, 45);
+  doc.text(`Department: ${slip.department}`, 12, 50);
 
-  // Main Salary Table - Compact layout
-  const salaryData = [
-    ['EARNINGS', 'AMOUNT (₹)', 'DEDUCTIONS', 'AMOUNT (₹)'],
-    [
-      'Basic Salary', 
-      (slip.basic || 0).toLocaleString(),
-      'Provident Fund', 
-      (slip.pfAmount || 0).toLocaleString()
-    ],
-    [
-      'House Rent Allowance', 
-      (slip.hra || 0).toLocaleString(),
-      'Professional Tax', 
-      (slip.professionalTax || 0).toLocaleString()
-    ],
-    [
-      'Fuel Allowance', 
-      (slip.fuelAllowance || 0).toLocaleString(),
-      'Absent Deduction', 
-      (slip.absentDeduction || 0).toLocaleString()
-    ],
-    [
-      'Performance Bonus', 
-      (slip.bonus || 0).toLocaleString(),
-      '', 
-      ''
-    ]
-  ];
+  doc.text(`Period: ${slip.yearMonth}`, W - 12, 40, { align: "right" });
+  doc.text(`Designation: ${slip.role}`, W - 12, 45, { align: "right" });
+  doc.text(
+    `Days: ${slip.totalDays || 0} | Absent: ${slip.absent || 0}`,
+    W - 12,
+    50,
+    { align: "right" }
+  );
 
-  autoTable(doc, {
-    startY: 48,
-    body: salaryData,
-    theme: 'grid',
-    headStyles: {
-      fillColor: darkColor,
-      textColor: white,
-      fontStyle: 'bold',
-      fontSize: 9
-    },
-    bodyStyles: {
-      fontSize: 8,
-      cellPadding: 3,
-      minCellHeight: 8
-    },
-    styles: {
-      lineWidth: 0.1,
-      lineColor: [200, 200, 200]
-    },
-    columnStyles: {
-      0: { cellWidth: 45, fontStyle: 'bold' },
-      1: { cellWidth: 30, halign: 'right' },
-      2: { cellWidth: 45, fontStyle: 'bold' },
-      3: { cellWidth: 30, halign: 'right' }
-    },
-    margin: { left: 14, right: 14 }
-  });
+  doc.line(12, 54, W - 12, 54);
 
-  const tableY = (doc as any).lastAutoTable.finalY + 5;
+  // EARNINGS & DEDUCTIONS TITLES
+  doc.setFont("helvetica", "bold");
+  doc.text("EARNINGS", 12, 62);
+  doc.text("DEDUCTIONS", W / 2 + 4, 62);
 
-  // Summary Section - Compact
-  const totalEarnings = (slip.basic || 0) + (slip.hra || 0) + (slip.fuelAllowance || 0) + (slip.bonus || 0);
-  const totalDeductions = (slip.pfAmount || 0) + (slip.professionalTax || 0) + (slip.absentDeduction || 0);
+  doc.setFont("helvetica", "normal");
+  const row = (y: number, leftTitle: string, leftVal: any, rightTitle?: string, rightVal?: any) => {
+    doc.text(leftTitle, 12, y);
+    doc.text(`₹${format(leftVal)}`, 64, y, { align: "right" });
 
-  const summaryData = [
-    ['TOTAL EARNINGS', `₹${totalEarnings.toLocaleString()}`],
-    ['TOTAL DEDUCTIONS', `₹${totalDeductions.toLocaleString()}`],
-    ['NET SALARY', `₹${(slip.netSalary || 0).toLocaleString()}`]
-  ];
+    if (rightTitle) {
+      doc.text(rightTitle, W / 2 + 4, y);
+      doc.text(`₹${format(rightVal)}`, W - 12, y, { align: "right" });
+    }
+  };
 
-  autoTable(doc, {
-    startY: tableY,
-    body: summaryData,
-    theme: 'grid',
-    bodyStyles: {
-      fontSize: 9,
-      cellPadding: 4,
-      fontStyle: 'bold'
-    },
-    columnStyles: {
-      0: { cellWidth: 70, fillColor: lightGray },
-      1: { cellWidth: 50, halign: 'right', fillColor: lightGray }
-    },
-    styles: {
-      lineWidth: 0.1,
-      lineColor: [200, 200, 200]
-    },
-    margin: { left: 14, right: 14 }
-  });
+  let y = 68;
+  row(y, "Basic Salary:", slip.basic, "Provident Fund:", slip.pfAmount);
+  row((y += 6), "HRA:", slip.hra, "Professional Tax:", slip.professionalTax);
+  row((y += 6), "Fuel Allowance:", slip.fuelAllowance);
 
-  const summaryY = (doc as any).lastAutoTable.finalY + 8;
-
-  // Leave Information - Compact horizontal layout
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...darkColor);
-  doc.text('LEAVE INFORMATION', 14, summaryY);
-
-  const leaveData = [
-    ['Paid Leaves', slip.paidLeaveUsed || 0],
-    ['LOP Days', slip.lopDays || 0],
-    ['Casual Leaves', slip.casualLeavesConsumed || 0],
-    ['Sick Leaves', slip.sickLeavesConsumed || 0],
-    ['Leaves Balance', slip.leavesRemaining || 0]
-  ];
-
-  // Create leave table manually for better control
-  const leaveTableY = summaryY + 4;
-  const colWidth = 36;
-  
-  leaveData.forEach(([label, value], index) => {
-    const xPos = 14 + (index * colWidth);
-    
-    // Label
-    doc.setFontSize(7);
-    doc.setFont('helvetica', 'bold');
-    doc.text(label, xPos, leaveTableY);
-    
-    // Value
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'normal');
-    doc.text(value.toString(), xPos, leaveTableY + 4);
-  });
-
-  // Add a simple line separator
-  doc.setDrawColor(200, 200, 200);
-  doc.line(14, leaveTableY - 2, 196, leaveTableY - 2);
-
-  const leaveY = leaveTableY + 10;
-
-  // Additional Details
-  doc.setFontSize(7);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(100, 100, 100);
-  
-  if (slip.absentDeduction > 0) {
-    doc.text(`Note: ${slip.lopDays || 0} LOP days deducted @ ₹${(slip.perDaySalary || 0).toLocaleString()}/day`, 14, leaveY);
+  if (slip.bonus > 0) {
+    row((y += 6), "Performance Bonus:", slip.bonus);
   }
-  
-  // Footer
-  doc.text('This is a computer-generated document. No signature required.', 105, leaveY + 8, { align: 'center' });
-  doc.setFontSize(6);
-  doc.text('Confidential - JHEX Consulting LLP', 105, leaveY + 12, { align: 'center' });
 
-  // Save PDF
+  const totalE =
+    (slip.basic || 0) +
+    (slip.hra || 0) +
+    (slip.fuelAllowance || 0) +
+    (slip.bonus || 0);
+
+  const totalD =
+    (slip.pfAmount || 0) +
+    (slip.professionalTax || 0);
+
+  // TOTALS SECTION
+  doc.setLineWidth(0.3);
+  doc.line(12, y + 8, W - 12, y + 8);
+
+  doc.setFont("helvetica", "bold");
+  doc.text("Total Earnings:", 12, y + 14);
+  doc.text(`₹${format(totalE)}`, 64, y + 14, { align: "right" });
+
+  doc.text("Total Deductions:", W / 2 + 4, y + 14);
+  doc.text(`₹${format(totalD)}`, W - 12, y + 14, { align: "right" });
+
+  // NET SALARY
+  doc.setLineWidth(0.4);
+  doc.line(12, y + 18, W - 12, y + 18);
+  doc.line(12, y + 19, W - 12, y + 19);
+
+  doc.setFontSize(11);
+  doc.text("NET SALARY:", 12, y + 28);
+  doc.text(`₹${format(slip.netSalary)}`, W - 12, y + 28, { align: "right" });
+
+  // FOOTER (slightly above bottom)
+  doc.setFontSize(7);
+  doc.text(
+    "This is a computer-generated document and does not require signature.",
+    W / 2,
+    H - 14,
+    { align: "center" }
+  );
+
+  // SAVE
   doc.save(`Salary_${slip.employeeId}_${slip.yearMonth}.pdf`);
 }
