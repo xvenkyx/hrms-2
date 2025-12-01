@@ -10,12 +10,11 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import { useAuth } from "react-oidc-context";
+import { useAuth } from "@/context/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { createEmployee } from "@/api/employees";
 
 export default function EmployeeRegistration() {
-  const auth = useAuth();
+  const { user, register, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -39,7 +38,7 @@ export default function EmployeeRegistration() {
     "HR",
     "Sales",
     "Marketing",
-    "Engineering",
+    "Technical",
     "Admin",
     "Utility",
   ];
@@ -56,42 +55,29 @@ export default function EmployeeRegistration() {
     setIsSubmitting(true);
 
     try {
-      // Convert department name to department_id
-      const departmentMap: { [key: string]: number } = {
-        HR: 1,
-        Sales: 2,
-        Marketing: 3,
-        Engineering: 4,
-        Admin: 5,
-        Utility: 6,
-      };
-
-      const employeeData = {
-        cognito_user_id: auth.user?.profile.sub,
-        company_email: auth.user?.profile.email,
-        first_name: formData.firstName,
-        last_name: formData.lastName,
+      // Since registration is now done via /auth endpoint
+      const registrationData = {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        company_email: user?.email || '',
+        password: "temp123", // Temporary password for registration
+        department: formData.department,
+        designation: formData.designation || "",
         personal_email: formData.personalEmail || "",
         contact_number: formData.contactNumber || "",
         date_of_birth: formData.dateOfBirth || "",
         gender: formData.gender || "",
         address: formData.address || "",
-        designation: formData.designation || "",
-        department_id: departmentMap[formData.department],
         account_number: formData.accountNumber || "",
         ifsc_code: formData.ifscCode || "",
         pan_number: formData.panNumber || "",
         uan_number: formData.uanNumber || "",
       };
 
-      console.log("📤 Sending employee data:", employeeData);
-      console.log("🔑 Cognito User ID:", auth.user?.profile.sub);
-      console.log("📧 Company Email:", auth.user?.profile.email);
-      console.log("🏢 Department selected:", formData.department);
-      console.log("🔢 Department ID:", departmentMap[formData.department]);
+      console.log("📤 Sending registration data:", registrationData);
 
-      const result = await createEmployee(employeeData);
-      console.log("✅ Employee created:", result);
+      const result = await register(registrationData);
+      console.log("✅ Registration successful:", result);
 
       alert("Registration completed successfully!");
       navigate("/my-profile");
@@ -110,16 +96,27 @@ export default function EmployeeRegistration() {
     }));
   };
 
-  if (!auth.isAuthenticated) {
+  if (!isAuthenticated) {
     return (
       <Card className="w-full max-w-2xl mx-auto">
         <CardContent className="p-6 text-center">
           <p className="text-lg text-gray-600">
             Please sign in to complete your registration.
           </p>
+          <Button 
+            className="mt-4 bg-blue-600 hover:bg-blue-700"
+            onClick={() => navigate("/login")}
+          >
+            Go to Login
+          </Button>
         </CardContent>
       </Card>
     );
+  }
+
+  if (user && user.employeeId) {
+    navigate("/my-profile");
+    return null;
   }
 
   return (
@@ -130,6 +127,9 @@ export default function EmployeeRegistration() {
         </h1>
         <p className="text-gray-600 mt-2">
           Welcome to JHEX! Please complete your employee profile.
+        </p>
+        <p className="text-sm text-blue-600 mt-1">
+          Logged in as: {user?.email}
         </p>
       </div>
 

@@ -1,68 +1,28 @@
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
-import { LoginButton } from "@/components/LoginButton";
-import { useAuth } from "react-oidc-context";
-import { getEmployeeByCognitoId } from "@/api/employees";
+import { useAuth } from "@/context/AuthContext";
 
 export default function MainLayout() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user, isAuthenticated, isLoading, logout } = useAuth();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isRegistered, setIsRegistered] = useState<boolean | null>(null);
-  const auth = useAuth();
 
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
     }, 1000);
-
     return () => clearInterval(timer);
   }, []);
 
-  // Updated useEffect for checking registration
+  // Redirect to login if not authenticated
   useEffect(() => {
-    const checkEmployeeRegistration = async () => {
-      if (auth.isAuthenticated && auth.user) {
-        try {
-          console.log("Checking registration for user:", auth.user.profile.sub);
-          const employee = await getEmployeeByCognitoId(auth.user.profile.sub);
-          const registered = !!employee;
-          
-          setIsRegistered(registered);
-
-          console.log("Registration check result:", {
-            isRegistered: registered,
-            path: location.pathname,
-          });
-
-          // If NOT registered AND not already on registration page, redirect to register
-          if (!registered && location.pathname !== "/register") {
-            console.log("Redirecting to registration page");
-            navigate("/register");
-          }
-
-          // If already registered AND on registration page, redirect to dashboard
-          if (registered && location.pathname === "/register") {
-            console.log("Already registered, redirecting to dashboard");
-            navigate("/");
-          }
-        } catch (error) {
-          console.error("Error checking registration:", error);
-          setIsRegistered(false);
-        }
-      } else {
-        setIsRegistered(false);
-      }
-    };
-
-    if (auth.isAuthenticated) {
-      checkEmployeeRegistration();
-    } else {
-      setIsRegistered(false);
+    if (!isLoading && !isAuthenticated && location.pathname !== '/login') {
+      navigate('/login');
     }
-  }, [auth.isAuthenticated, auth.user, location.pathname, navigate]);
+  }, [isAuthenticated, isLoading, location.pathname, navigate]);
 
   const baseMenu = [
     { name: "Dashboard", path: "/", icon: "📊" },
@@ -74,30 +34,46 @@ export default function MainLayout() {
     { name: "Leave Requests", path: "/leave-requests", icon: "📋" },
   ];
 
+  const adminMenu = [
+    { name: "Employees", path: "/employees", icon: "👥" },
+    { name: "Settings", path: "/settings", icon: "⚙️" },
+    { name: "Generate Slip", path: "/generate-slip", icon: "💰" },
+    { name: "Salary History", path: "/salary-history", icon: "📈" },
+  ];
+
   const getMenu = () => {
-    if (!auth.isAuthenticated) {
-      return baseMenu;
+    if (!isAuthenticated || !user) return [];
+
+    let menu = [...baseMenu];
+
+    // Add employee menu for all authenticated users
+    menu = [...menu, ...employeeMenu];
+
+    // Add admin menu for admin/hr users
+    if (user.role === 'admin' || user.role === 'hr') {
+      menu = [...menu, ...adminMenu];
     }
 
-    // Show loading state while checking registration
-    if (isRegistered === null) {
-      return baseMenu;
-    }
-
-    if (!isRegistered) {
-      // Show only basic menu + registration link
-      return [
-        ...baseMenu,
-        { name: "Complete Registration", path: "/register", icon: "📝" },
-      ];
-    }
-
-    return [...baseMenu, ...employeeMenu];
+    return menu;
   };
 
   const menu = getMenu();
 
-  // Rest of your component remains the same...
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated || !user) {
+    return null; // Will redirect to login
+  }
+
   return (
     <div className="min-h-screen bg-linear-to-br from-blue-50 to-indigo-100">
       {/* Header */}
@@ -114,9 +90,20 @@ export default function MainLayout() {
               </div>
             </div>
 
-            {/* Desktop: Login + Time */}
+            {/* Desktop: User Info + Time */}
             <div className="hidden md:flex items-center space-x-4">
-              <LoginButton />
+              <div className="text-sm text-gray-700">
+                👋 {user.firstName || 'User'} {user.lastName || ''}
+                <span className="ml-2 px-2 py-1 bg-gray-100 rounded-full text-xs">
+                  {user.department || 'Unknown'} • {user.role || 'employee'}
+                </span>
+              </div>
+              <button
+                onClick={logout}
+                className="text-sm bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-md transition-colors"
+              >
+                Sign out
+              </button>
               <div className="text-sm text-gray-600 bg-gray-50 px-3 py-1 rounded-full border">
                 🕒 {currentTime.toLocaleTimeString()}
               </div>
@@ -125,9 +112,8 @@ export default function MainLayout() {
               </div>
             </div>
 
-            {/* Mobile: Login + Menu Button */}
+            {/* Mobile: Menu Button */}
             <div className="flex md:hidden items-center space-x-2">
-              <LoginButton />
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                 className="p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100"
@@ -208,12 +194,23 @@ export default function MainLayout() {
                 ))}
               </nav>
 
-              {/* Mobile Time Display */}
+              {/* Mobile User Info */}
               <div className="absolute bottom-0 left-0 right-0 p-4 border-t bg-white">
                 <div className="text-center text-sm text-gray-600 space-y-2">
                   <div className="pb-2">
-                    <LoginButton />
+                    <div className="font-medium">
+                      {user.firstName || 'User'} {user.lastName || ''}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {user.department || 'Unknown'} • {user.role || 'employee'}
+                    </div>
                   </div>
+                  <button
+                    onClick={logout}
+                    className="w-full text-sm bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-md transition-colors"
+                  >
+                    Sign out
+                  </button>
                   <div>🕒 {currentTime.toLocaleTimeString()}</div>
                   <div>📅 {currentTime.toLocaleDateString()}</div>
                 </div>

@@ -1,92 +1,77 @@
-const API_BASE = 'https://ic9wiavkl4.execute-api.us-east-1.amazonaws.com/Stage1';
+const API_BASE = import.meta.env.VITE_API_BASE || 'https://YOUR_API_ID.execute-api.us-east-1.amazonaws.com/prod';
 
-export interface Employee {
-  employee_id: string;
-  cognito_user_id: string;
-  company_email: string;
-  first_name: string;
-  last_name: string;
-  personal_email: string;
-  contact_number: string;
-  date_of_birth: string;
-  gender: string;
-  address: string;
-  designation: string;
-  department_id: number;
-  account_number: string;
-  ifsc_code: string;
-  pan_number: string;
-  uan_number: string;
-  created_at: string;
-  updated_at: string;
-}
+// Add session token to all requests
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('sessionToken');
+  return {
+    'Content-Type': 'application/json',
+    ...(token && { 'Authorization': `Bearer ${token}` })
+  };
+};
 
-// Get all employees - returns array of employees directly
-export async function fetchEmployees(): Promise<Employee[]> {
-  const response = await fetch(`${API_BASE}/employees`);
+export async function fetchEmployees(): Promise<any[]> {
+  const response = await fetch(`${API_BASE}/employees`, {
+    headers: getAuthHeaders()
+  });
   
   if (!response.ok) {
     throw new Error('Failed to fetch employees');
   }
   
   const data = await response.json();
-  return data.employees; // Extract the employees array from the response
+  return data.employees || [];
 }
 
-// Get employee by Cognito user ID
-export async function getEmployeeByCognitoId(cognitoUserId: string): Promise<Employee | null> {
-  try {
-    const response = await fetch(`${API_BASE}/employees/by-cognito/${cognitoUserId}`);
-    
-    if (!response.ok) {
-      if (response.status === 404) {
-        return null;
-      }
-      throw new Error(`Failed to fetch employee: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    return data.employee; // Return the employee object directly
-  } catch (error) {
-    console.error('Error fetching employee by cognito ID:', error);
-    throw error;
-  }
-}
-
-// Create new employee
-export async function createEmployee(employeeData: any): Promise<{ message: string; employee: Employee }> {
-  console.log("🌐 Making API call to:", `${API_BASE}/employees`);
-  console.log("📦 Request payload:", employeeData);
-  
-  const response = await fetch(`${API_BASE}/employees`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(employeeData),
+export async function getEmployeeById(employeeId: string): Promise<any | null> {
+  const response = await fetch(`${API_BASE}/employees/${employeeId}`, {
+    headers: getAuthHeaders()
   });
   
-  console.log("📨 Response status:", response.status);
+  if (response.status === 404) {
+    return null;
+  }
+  
+  if (!response.ok) {
+    throw new Error('Failed to fetch employee');
+  }
+  
+  const data = await response.json();
+  return data.employee;
+}
+
+export async function getMyProfile(): Promise<any> {
+  const response = await fetch(`${API_BASE}/my-profile`, {
+    headers: getAuthHeaders()
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to fetch profile');
+  }
+  
+  const data = await response.json();
+  return data.employee;
+}
+
+export async function createEmployee(employeeData: any): Promise<{ message: string; employee: any }> {
+  const response = await fetch(`${API_BASE}/employees`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(employeeData)
+  });
   
   if (!response.ok) {
     const errorText = await response.text();
-    console.error("❌ API Error response:", errorText);
     throw new Error(`Failed to create employee: ${response.status} ${errorText}`);
   }
   
-  const result = await response.json();
-  console.log("✅ API Success response:", result);
-  return result;
+  return response.json();
 }
 
-// Update employee
-export async function updateEmployee(employeeId: string, updates: any): Promise<{ message: string; employee_id: string }> {
+export async function updateEmployee(employeeId: string, updates: any): Promise<any> {
   const response = await fetch(`${API_BASE}/employees/${employeeId}`, {
     method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(updates),
+    headers: getAuthHeaders(),
+    body: JSON.stringify(updates)
   });
   
   if (!response.ok) {
@@ -96,10 +81,10 @@ export async function updateEmployee(employeeId: string, updates: any): Promise<
   return response.json();
 }
 
-// Delete employee
-export async function deleteEmployee(employeeId: string): Promise<{ message: string; employee_id: string }> {
+export async function deleteEmployee(employeeId: string): Promise<any> {
   const response = await fetch(`${API_BASE}/employees/${employeeId}`, {
     method: 'DELETE',
+    headers: getAuthHeaders()
   });
   
   if (!response.ok) {

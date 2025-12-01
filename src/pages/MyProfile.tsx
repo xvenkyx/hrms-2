@@ -2,21 +2,21 @@ import { useEffect, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useAuth } from "react-oidc-context";
-import { getEmployeeByCognitoId, type Employee } from "@/api/employees";
+import { useAuth } from "@/context/AuthContext";
+import { getMyProfile } from "@/api/employees";
 
 export default function MyProfile() {
-  const auth = useAuth();
-  const [employeeData, setEmployeeData] = useState<Employee | null>(null);
+  const { user, isAuthenticated } = useAuth();
+  const [employeeData, setEmployeeData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchEmployeeData = async () => {
-      if (auth.isAuthenticated && auth.user) {
+      if (isAuthenticated) {
         try {
           setLoading(true);
-          const employee = await getEmployeeByCognitoId(auth.user.profile.sub);
+          const employee = await getMyProfile();
           
           if (employee) {
             setEmployeeData(employee);
@@ -32,13 +32,19 @@ export default function MyProfile() {
     };
 
     fetchEmployeeData();
-  }, [auth.isAuthenticated, auth.user]);
+  }, [isAuthenticated]);
 
-  if (!auth.isAuthenticated) {
+  if (!isAuthenticated) {
     return (
       <Card className="w-full max-w-2xl mx-auto">
         <CardContent className="p-6 text-center">
           <p className="text-lg text-gray-600">Please sign in to view your profile.</p>
+          <Button 
+            className="mt-4 bg-blue-600 hover:bg-blue-700"
+            onClick={() => window.location.href = '/login'}
+          >
+            Go to Login
+          </Button>
         </CardContent>
       </Card>
     );
@@ -76,7 +82,7 @@ export default function MyProfile() {
     { id: 1, name: 'HR' },
     { id: 2, name: 'Sales' },
     { id: 3, name: 'Marketing' },
-    { id: 4, name: 'Engineering' },
+    { id: 4, name: 'Technical' },
     { id: 5, name: 'Admin' },
     { id: 6, name: 'Utility' }
   ];
@@ -101,9 +107,9 @@ export default function MyProfile() {
 
   // Calculate employment duration
   const getEmploymentDuration = () => {
-    if (!employeeData.created_at) return 'Not available';
+    if (!employeeData.createdAt) return 'Not available';
     try {
-      const startDate = new Date(employeeData.created_at);
+      const startDate = new Date(employeeData.createdAt);
       const now = new Date();
       const diffTime = Math.abs(now.getTime() - startDate.getTime());
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -128,7 +134,7 @@ export default function MyProfile() {
             My Profile
           </h1>
           <p className="text-gray-600 mt-1">
-            Employee ID: {employeeData.employee_id}
+            Employee ID: {employeeData.employeeId}
           </p>
         </div>
         <Button 
@@ -152,13 +158,13 @@ export default function MyProfile() {
               <div>
                 <p className="text-sm text-gray-500 font-medium">First Name</p>
                 <p className="font-semibold text-gray-900 mt-1">
-                  {employeeData.first_name || 'Not specified'}
+                  {employeeData.firstName || 'Not specified'}
                 </p>
               </div>
               <div>
                 <p className="text-sm text-gray-500 font-medium">Last Name</p>
                 <p className="font-semibold text-gray-900 mt-1">
-                  {employeeData.last_name || 'Not specified'}
+                  {employeeData.lastName || 'Not specified'}
                 </p>
               </div>
             </div>
@@ -238,11 +244,11 @@ export default function MyProfile() {
               </div>
             )}
             
-            {employeeData.department_id && (
+            {employeeData.department && (
               <div>
                 <p className="text-sm text-gray-500 font-medium">Department</p>
                 <Badge variant="secondary" className="mt-1">
-                  {getDepartmentName(employeeData.department_id)}
+                  {employeeData.department}
                 </Badge>
               </div>
             )}
@@ -250,7 +256,7 @@ export default function MyProfile() {
             <div>
               <p className="text-sm text-gray-500 font-medium">Employee Since</p>
               <p className="font-semibold text-gray-900 mt-1">
-                {formatDate(employeeData.created_at)}
+                {formatDate(employeeData.createdAt)}
               </p>
               <p className="text-xs text-gray-400 mt-1">
                 {getEmploymentDuration()}
@@ -260,7 +266,7 @@ export default function MyProfile() {
             <div>
               <p className="text-sm text-gray-500 font-medium">Last Updated</p>
               <p className="font-semibold text-gray-900 mt-1">
-                {employeeData.updated_at ? formatDate(employeeData.updated_at) : 'Never'}
+                {employeeData.updatedAt ? formatDate(employeeData.updatedAt) : 'Never'}
               </p>
             </div>
           </CardContent>
@@ -337,10 +343,10 @@ export default function MyProfile() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <p className="text-sm text-gray-500 font-medium">Cognito User ID</p>
-              <p className="font-semibold text-gray-900 mt-1 text-xs font-mono break-all">
-                {employeeData.cognito_user_id}
-              </p>
+              <p className="text-sm text-gray-500 font-medium">Role</p>
+              <Badge variant="default" className="mt-1">
+                {employeeData.role || 'employee'}
+              </Badge>
             </div>
             
             <div>
@@ -353,7 +359,7 @@ export default function MyProfile() {
             <div>
               <p className="text-sm text-gray-500 font-medium">Registration Date</p>
               <p className="font-semibold text-gray-900 mt-1">
-                {formatDate(employeeData.created_at)}
+                {formatDate(employeeData.createdAt)}
               </p>
             </div>
           </CardContent>
@@ -378,12 +384,6 @@ export default function MyProfile() {
               onClick={() => window.location.href = '/bank-details'}
             >
               Update Bank Details
-            </Button>
-            <Button 
-              variant="outline"
-              onClick={() => window.location.href = '/documents'}
-            >
-              View Documents
             </Button>
           </div>
         </CardContent>
