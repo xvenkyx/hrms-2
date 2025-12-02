@@ -47,12 +47,24 @@ export default function MainLayout() {
 
     let menu = [...baseMenu];
 
-    // Add employee menu for all authenticated users
-    menu = [...menu, ...employeeMenu];
-
-    // Add admin menu for admin/hr users
-    if (user.role === 'admin' || user.role === 'hr') {
-      menu = [...menu, ...adminMenu];
+    if (user.role === 'employee') {
+      // Employee menu
+      menu = [
+        ...menu,
+        { name: "My Profile", path: "/my-profile", icon: "👤" },
+        { name: "My Leave Requests", path: "/my-leave-requests", icon: "📋" },
+      ];
+    } else if (user.role === 'hr' || user.role === 'admin') {
+      // HR/Admin menu
+      menu = [
+        ...menu,
+        { name: "Employees", path: "/employees", icon: "👥" },
+        { name: "Leave Requests", path: "/leave-requests", icon: "📋" },
+        { name: "Settings", path: "/settings", icon: "⚙️" },
+        { name: "Generate Slip", path: "/generate-slip", icon: "💰" },
+        { name: "Salary History", path: "/salary-history", icon: "📈" },
+        { name: "My Profile", path: "/my-profile", icon: "👤" },
+      ];
     }
 
     return menu;

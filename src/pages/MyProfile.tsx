@@ -12,32 +12,30 @@ export default function MyProfile() {
   const [employeeData, setEmployeeData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showRegistrationPrompt, setShowRegistrationPrompt] = useState(false);
 
   useEffect(() => {
     let mounted = true;
     
     const fetchEmployeeData = async () => {
-      if (isAuthenticated && user) {
+      if (isAuthenticated) {
         try {
+          console.log("🔄 Fetching profile data...");
           setLoading(true);
           setError(null);
+          
           const employee = await getMyProfile();
+          console.log("📥 Profile data received:", employee);
           
           if (mounted) {
             if (employee) {
               setEmployeeData(employee);
             } else {
-              setError("Employee profile not found");
-              // Only show registration prompt if user doesn't have employeeId
-              if (!user.employeeId) {
-                setShowRegistrationPrompt(true);
-              }
+              setError("Profile not found. Please complete your registration.");
             }
           }
         } catch (err: any) {
           if (mounted) {
-            console.error("Error fetching profile:", err);
+            console.error("❌ Error fetching profile:", err);
             setError(err.message || "Failed to load profile");
           }
         } finally {
@@ -57,17 +55,7 @@ export default function MyProfile() {
     return () => {
       mounted = false;
     };
-  }, [isAuthenticated, user]);
-
-  // Check if user needs to register
-  useEffect(() => {
-    if (!loading && showRegistrationPrompt && isAuthenticated) {
-      const timer = setTimeout(() => {
-        navigate('/register');
-      }, 1500);
-      return () => clearTimeout(timer);
-    }
-  }, [loading, showRegistrationPrompt, navigate, isAuthenticated]);
+  }, [isAuthenticated]);
 
   if (!isAuthenticated) {
     return (
@@ -105,39 +93,23 @@ export default function MyProfile() {
           </p>
           <div className="mt-6 space-y-3">
             <p className="text-gray-500">
-              {showRegistrationPrompt 
-                ? "It looks like your profile hasn't been set up yet." 
-                : "Unable to load your profile."}
+              Unable to load your profile.
             </p>
-            {showRegistrationPrompt ? (
-              <>
-                <p className="text-sm text-blue-600 animate-pulse">
-                  Redirecting to registration page...
-                </p>
-                <Button 
-                  className="bg-blue-600 hover:bg-blue-700"
-                  onClick={() => navigate('/register')}
-                >
-                  Go to Registration Now
-                </Button>
-              </>
-            ) : (
-              <div className="space-y-3">
-                <Button 
-                  className="bg-blue-600 hover:bg-blue-700"
-                  onClick={() => navigate('/register')}
-                >
-                  Complete Registration
-                </Button>
-                <Button 
-                  variant="outline"
-                  className="ml-3"
-                  onClick={() => window.location.reload()}
-                >
-                  Refresh
-                </Button>
-              </div>
-            )}
+            <div className="space-y-3">
+              <Button 
+                className="bg-blue-600 hover:bg-blue-700"
+                onClick={() => navigate('/register')}
+              >
+                Complete Registration
+              </Button>
+              <Button 
+                variant="outline"
+                className="ml-3"
+                onClick={() => window.location.reload()}
+              >
+                Refresh
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

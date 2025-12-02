@@ -1,12 +1,23 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 
-interface User {
-  employeeId?: string;
+// In AuthContext file, update the User interface:
+export interface User {
+  employeeId: string;  // Change from optional to required
   email: string;
   firstName?: string;
   lastName?: string;
   role?: 'admin' | 'hr' | 'employee';
   department?: string;
+  designation?: string;  // Add this
+  baseSalary?: number;  // Add this
+  leavesRemaining?: number;  // Add this
+  casualLeavesUsed?: number;  // Add this
+  casualLeavesTotal?: number;  // Add this
+  sickLeavesUsed?: number;  // Add this
+  sickLeavesTotal?: number;  // Add this
+  date_of_birth?: string;  // Add this
+  joiningDate?: string;  // Add this
+  pfApplicable?: boolean;  // Add this
 }
 
 interface AuthContextType {
