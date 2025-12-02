@@ -20,7 +20,8 @@ export default function MainLayout() {
   // Redirect to login if not authenticated
   useEffect(() => {
     if (!isLoading && !isAuthenticated && location.pathname !== '/login') {
-      navigate('/login');
+      console.log("Redirecting to login, auth state:", { isAuthenticated, isLoading });
+      navigate('/login', { replace: true });
     }
   }, [isAuthenticated, isLoading, location.pathname, navigate]);
 

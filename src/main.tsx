@@ -1,7 +1,7 @@
 import React from "react"
 import ReactDOM from "react-dom/client"
 import { BrowserRouter, Routes, Route } from "react-router-dom"
-import { AuthProvider } from "@/context/AuthContext" // Use your existing auth context
+import { AuthProvider } from "@/context/AuthContext"
 
 import MainLayout from "@/components/layout/MainLayout"
 import Dashboard from "@/pages/Dashboard"
@@ -12,9 +12,10 @@ import GenerateSlip from "@/pages/GenerateSlip"
 import SalaryHistory from "./pages/SalaryHistory"
 import EmployeeRegistration from "./pages/EmployeeRegistration"
 import MyProfile from "./pages/MyProfile"
-import Login from "./pages/Login" // NEW
-import LeaveRequests from "./pages/LeaveRequests" // NEW
-import MyLeaveRequests from "./pages/MyLeaveRequests" // NEW
+import Login from "./pages/Login"
+import LeaveRequests from "./pages/LeaveRequests"
+import MyLeaveRequests from "./pages/MyLeaveRequests"
+import EditProfile from "./pages/EditProfile" // NEW - ADD THIS IMPORT
 
 import "./index.css"
 
@@ -35,6 +36,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="my-profile" element={<MyProfile />} />
             <Route path="leave-requests" element={<LeaveRequests />} />
             <Route path="my-leave-requests" element={<MyLeaveRequests />} />
+            <Route path="edit-profile" element={<EditProfile />} /> {/* NEW - ADD THIS ROUTE */}
           </Route>
         </Routes>
       </BrowserRouter>

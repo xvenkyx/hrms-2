@@ -4,35 +4,70 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/AuthContext";
 import { getMyProfile } from "@/api/employees";
+import { useNavigate } from "react-router-dom";
 
 export default function MyProfile() {
   const { user, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
   const [employeeData, setEmployeeData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showRegistrationPrompt, setShowRegistrationPrompt] = useState(false);
 
   useEffect(() => {
+    let mounted = true;
+    
     const fetchEmployeeData = async () => {
-      if (isAuthenticated) {
+      if (isAuthenticated && user) {
         try {
           setLoading(true);
+          setError(null);
           const employee = await getMyProfile();
           
-          if (employee) {
-            setEmployeeData(employee);
-          } else {
-            setError("Employee profile not found");
+          if (mounted) {
+            if (employee) {
+              setEmployeeData(employee);
+            } else {
+              setError("Employee profile not found");
+              // Only show registration prompt if user doesn't have employeeId
+              if (!user.employeeId) {
+                setShowRegistrationPrompt(true);
+              }
+            }
           }
         } catch (err: any) {
-          setError(err.message);
+          if (mounted) {
+            console.error("Error fetching profile:", err);
+            setError(err.message || "Failed to load profile");
+          }
         } finally {
+          if (mounted) {
+            setLoading(false);
+          }
+        }
+      } else {
+        if (mounted) {
           setLoading(false);
         }
       }
     };
 
     fetchEmployeeData();
-  }, [isAuthenticated]);
+
+    return () => {
+      mounted = false;
+    };
+  }, [isAuthenticated, user]);
+
+  // Check if user needs to register
+  useEffect(() => {
+    if (!loading && showRegistrationPrompt && isAuthenticated) {
+      const timer = setTimeout(() => {
+        navigate('/register');
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [loading, showRegistrationPrompt, navigate, isAuthenticated]);
 
   if (!isAuthenticated) {
     return (
@@ -41,7 +76,7 @@ export default function MyProfile() {
           <p className="text-lg text-gray-600">Please sign in to view your profile.</p>
           <Button 
             className="mt-4 bg-blue-600 hover:bg-blue-700"
-            onClick={() => window.location.href = '/login'}
+            onClick={() => navigate('/login')}
           >
             Go to Login
           </Button>
@@ -52,11 +87,12 @@ export default function MyProfile() {
 
   if (loading) {
     return (
-      <Card className="w-full max-w-2xl mx-auto">
-        <CardContent className="p-6 text-center">
-          <p className="text-lg text-gray-600">Loading your profile...</p>
-        </CardContent>
-      </Card>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading your profile...</p>
+        </div>
+      </div>
     );
   }
 
@@ -65,35 +101,85 @@ export default function MyProfile() {
       <Card className="w-full max-w-2xl mx-auto">
         <CardContent className="p-6 text-center">
           <p className="text-lg text-gray-600">
-            {error || "Profile not found. Please complete your registration."}
+            {error || "Profile not found"}
           </p>
-          <Button 
-            className="mt-4 bg-blue-600 hover:bg-blue-700"
-            onClick={() => window.location.href = '/register'}
-          >
-            Complete Registration
-          </Button>
+          <div className="mt-6 space-y-3">
+            <p className="text-gray-500">
+              {showRegistrationPrompt 
+                ? "It looks like your profile hasn't been set up yet." 
+                : "Unable to load your profile."}
+            </p>
+            {showRegistrationPrompt ? (
+              <>
+                <p className="text-sm text-blue-600 animate-pulse">
+                  Redirecting to registration page...
+                </p>
+                <Button 
+                  className="bg-blue-600 hover:bg-blue-700"
+                  onClick={() => navigate('/register')}
+                >
+                  Go to Registration Now
+                </Button>
+              </>
+            ) : (
+              <div className="space-y-3">
+                <Button 
+                  className="bg-blue-600 hover:bg-blue-700"
+                  onClick={() => navigate('/register')}
+                >
+                  Complete Registration
+                </Button>
+                <Button 
+                  variant="outline"
+                  className="ml-3"
+                  onClick={() => window.location.reload()}
+                >
+                  Refresh
+                </Button>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
     );
   }
 
-  const departments = [
-    { id: 1, name: 'HR' },
-    { id: 2, name: 'Sales' },
-    { id: 3, name: 'Marketing' },
-    { id: 4, name: 'Technical' },
-    { id: 5, name: 'Admin' },
-    { id: 6, name: 'Utility' }
-  ];
+  // Calculate profile completion percentage
+  const calculateProfileCompletion = () => {
+    const requiredFields = [
+      'firstName', 'lastName', 'department', 'designation',
+      'contact_number', 'date_of_birth', 'address'
+    ];
+    
+    const filledFields = requiredFields.filter(field => 
+      employeeData[field] && employeeData[field].toString().trim() !== ''
+    );
+    
+    return Math.round((filledFields.length / requiredFields.length) * 100);
+  };
 
-  const getDepartmentName = (deptId: number) => {
-    return departments.find(dept => dept.id === deptId)?.name || 'Unknown';
+  const profileCompletion = calculateProfileCompletion();
+  
+  // Determine profile status
+  const getProfileStatus = () => {
+    if (profileCompletion === 100) return 'Complete';
+    if (profileCompletion >= 70) return 'Mostly Complete';
+    if (profileCompletion >= 40) return 'Partially Complete';
+    return 'Incomplete';
+  };
+
+  const getStatusBadgeColor = () => {
+    switch (getProfileStatus()) {
+      case 'Complete': return 'bg-green-100 text-green-800';
+      case 'Mostly Complete': return 'bg-blue-100 text-blue-800';
+      case 'Partially Complete': return 'bg-yellow-100 text-yellow-800';
+      default: return 'bg-red-100 text-red-800';
+    }
   };
 
   // Format date for display
   const formatDate = (dateString: string) => {
-    if (!dateString) return 'Not specified';
+    if (!dateString || dateString === '') return 'Not specified';
     try {
       return new Date(dateString).toLocaleDateString('en-US', {
         year: 'numeric',
@@ -134,16 +220,49 @@ export default function MyProfile() {
             My Profile
           </h1>
           <p className="text-gray-600 mt-1">
-            Employee ID: {employeeData.employeeId}
+            Employee ID: {employeeData.employeeId || employeeData.id || 'N/A'}
           </p>
         </div>
-        <Button 
-          className="bg-blue-600 hover:bg-blue-700"
-          onClick={() => window.location.href = '/edit-profile'}
-        >
-          Edit Profile
-        </Button>
+        <div className="flex gap-3">
+          <Button 
+            variant="outline"
+            onClick={() => navigate('/edit-profile')}
+          >
+            Edit Profile
+          </Button>
+          <Button 
+            className="bg-blue-600 hover:bg-blue-700"
+            onClick={() => window.location.reload()}
+          >
+            Refresh
+          </Button>
+        </div>
       </div>
+
+      {/* Profile Completion Status */}
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-gray-900">Profile Completion</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Complete your profile to access all features
+              </p>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="w-32 bg-gray-200 rounded-full h-2">
+                <div 
+                  className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${profileCompletion}%` }}
+                ></div>
+              </div>
+              <Badge className={getStatusBadgeColor()}>
+                {getProfileStatus()} ({profileCompletion}%)
+              </Badge>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         {/* Personal Information Card */}
@@ -173,7 +292,7 @@ export default function MyProfile() {
               <div>
                 <p className="text-sm text-gray-500 font-medium">Company Email</p>
                 <p className="font-semibold text-gray-900 mt-1">
-                  {employeeData.company_email}
+                  {employeeData.company_email || employeeData.email || 'Not specified'}
                 </p>
               </div>
               
@@ -256,7 +375,7 @@ export default function MyProfile() {
             <div>
               <p className="text-sm text-gray-500 font-medium">Employee Since</p>
               <p className="font-semibold text-gray-900 mt-1">
-                {formatDate(employeeData.createdAt)}
+                {formatDate(employeeData.createdAt || employeeData.startDate)}
               </p>
               <p className="text-xs text-gray-400 mt-1">
                 {getEmploymentDuration()}
@@ -288,7 +407,16 @@ export default function MyProfile() {
                 </p>
               </div>
             ) : (
-              <p className="text-gray-500 text-sm">No bank account information provided</p>
+              <div className="text-center py-4">
+                <p className="text-gray-500 text-sm">No bank account information provided</p>
+                <Button 
+                  variant="link" 
+                  className="mt-2"
+                  onClick={() => navigate('/edit-profile')}
+                >
+                  Add Bank Details
+                </Button>
+              </div>
             )}
             
             {employeeData.ifsc_code && (
@@ -318,7 +446,16 @@ export default function MyProfile() {
                 </p>
               </div>
             ) : (
-              <p className="text-gray-500 text-sm">No PAN number provided</p>
+              <div className="text-center py-4">
+                <p className="text-gray-500 text-sm">No PAN number provided</p>
+                <Button 
+                  variant="link" 
+                  className="mt-2"
+                  onClick={() => navigate('/edit-profile')}
+                >
+                  Add PAN
+                </Button>
+              </div>
             )}
             
             {employeeData.uan_number ? (
@@ -329,7 +466,16 @@ export default function MyProfile() {
                 </p>
               </div>
             ) : (
-              <p className="text-gray-500 text-sm">No UAN number provided</p>
+              <div className="text-center py-4">
+                <p className="text-gray-500 text-sm">No UAN number provided</p>
+                <Button 
+                  variant="link" 
+                  className="mt-2"
+                  onClick={() => navigate('/edit-profile')}
+                >
+                  Add UAN
+                </Button>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -351,15 +497,15 @@ export default function MyProfile() {
             
             <div>
               <p className="text-sm text-gray-500 font-medium">Profile Status</p>
-              <Badge variant="default" className="mt-1 bg-green-100 text-green-800">
-                Complete
+              <Badge className={`mt-1 ${getStatusBadgeColor()}`}>
+                {getProfileStatus()}
               </Badge>
             </div>
             
             <div>
               <p className="text-sm text-gray-500 font-medium">Registration Date</p>
               <p className="font-semibold text-gray-900 mt-1">
-                {formatDate(employeeData.createdAt)}
+                {formatDate(employeeData.createdAt || employeeData.registrationDate)}
               </p>
             </div>
           </CardContent>
@@ -374,16 +520,22 @@ export default function MyProfile() {
         <CardContent>
           <div className="flex flex-wrap gap-4">
             <Button 
-              variant="outline"
-              onClick={() => window.location.href = '/edit-profile'}
+              className="bg-blue-600 hover:bg-blue-700"
+              onClick={() => navigate('/edit-profile')}
             >
-              Update Personal Info
+              Update Profile
             </Button>
             <Button 
               variant="outline"
-              onClick={() => window.location.href = '/bank-details'}
+              onClick={() => navigate('/change-password')}
             >
-              Update Bank Details
+              Change Password
+            </Button>
+            <Button 
+              variant="outline"
+              onClick={() => window.location.reload()}
+            >
+              Refresh Profile
             </Button>
           </div>
         </CardContent>

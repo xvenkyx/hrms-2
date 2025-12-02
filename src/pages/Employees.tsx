@@ -56,11 +56,15 @@ export default function Employees() {
   // Filter + Search Logic
   const filtered = useMemo(() => {
     return employees
-      .filter(
-        (emp) =>
-          emp.name.toLowerCase().includes(search.toLowerCase()) ||
-          emp.employeeId.toLowerCase().includes(search.toLowerCase())
-      )
+      .filter((emp) => {
+        const fullName = `${emp.firstName || ""} ${
+          emp.lastName || ""
+        }`.toLowerCase();
+        const employeeId = emp.employeeId?.toLowerCase() || "";
+        const searchTerm = search.toLowerCase();
+
+        return fullName.includes(searchTerm) || employeeId.includes(searchTerm);
+      })
       .filter((emp) => {
         if (filterDeduction === "all") return true;
         return emp.deductionType === filterDeduction;
@@ -85,14 +89,14 @@ export default function Employees() {
 
   const getDepartmentColor = (department: string) => {
     const colors: { [key: string]: string } = {
-      'Engineering': 'bg-blue-100 text-blue-800',
-      'Sales': 'bg-green-100 text-green-800',
-      'Marketing': 'bg-purple-100 text-purple-800',
-      'HR': 'bg-pink-100 text-pink-800',
-      'Finance': 'bg-orange-100 text-orange-800',
-      'Operations': 'bg-indigo-100 text-indigo-800'
+      Engineering: "bg-blue-100 text-blue-800",
+      Sales: "bg-green-100 text-green-800",
+      Marketing: "bg-purple-100 text-purple-800",
+      HR: "bg-pink-100 text-pink-800",
+      Finance: "bg-orange-100 text-orange-800",
+      Operations: "bg-indigo-100 text-indigo-800",
     };
-    return colors[department] || 'bg-gray-100 text-gray-800';
+    return colors[department] || "bg-gray-100 text-gray-800";
   };
 
   if (loading) {
@@ -113,7 +117,9 @@ export default function Employees() {
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Employees</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+            Employees
+          </h1>
           <p className="text-gray-600 mt-1">
             Manage your team members and their details
           </p>
@@ -130,8 +136,12 @@ export default function Employees() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-blue-600">Total Employees</p>
-                <p className="text-2xl font-bold text-blue-900">{employees.length}</p>
+                <p className="text-sm font-medium text-blue-600">
+                  Total Employees
+                </p>
+                <p className="text-2xl font-bold text-blue-900">
+                  {employees.length}
+                </p>
               </div>
               <div className="text-2xl">👥</div>
             </div>
@@ -143,7 +153,9 @@ export default function Employees() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-green-600">Active</p>
-                <p className="text-2xl font-bold text-green-900">{employees.length}</p>
+                <p className="text-2xl font-bold text-green-900">
+                  {employees.length}
+                </p>
               </div>
               <div className="text-2xl">✅</div>
             </div>
@@ -154,8 +166,12 @@ export default function Employees() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-purple-600">Departments</p>
-                <p className="text-2xl font-bold text-purple-900">{departments.length}</p>
+                <p className="text-sm font-medium text-purple-600">
+                  Departments
+                </p>
+                <p className="text-2xl font-bold text-purple-900">
+                  {departments.length}
+                </p>
               </div>
               <div className="text-2xl">🏢</div>
             </div>
@@ -166,9 +182,19 @@ export default function Employees() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-orange-600">Avg Salary</p>
+                <p className="text-sm font-medium text-orange-600">
+                  Avg Salary
+                </p>
                 <p className="text-2xl font-bold text-orange-900">
-                  ₹{employees.length > 0 ? Math.round(employees.reduce((sum, emp) => sum + emp.baseSalary, 0) / employees.length).toLocaleString() : 0}
+                  ₹
+                  {employees.length > 0
+                    ? Math.round(
+                        employees.reduce(
+                          (sum, emp) => sum + emp.baseSalary,
+                          0
+                        ) / employees.length
+                      ).toLocaleString()
+                    : 0}
                 </p>
               </div>
               <div className="text-2xl">💰</div>
@@ -198,9 +224,12 @@ export default function Employees() {
                 className="w-full"
               />
             </div>
-            
+
             <div className="flex flex-col sm:flex-row gap-2 flex-1">
-              <Select value={filterDepartment} onValueChange={setFilterDepartment}>
+              <Select
+                value={filterDepartment}
+                onValueChange={setFilterDepartment}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="All Departments" />
                 </SelectTrigger>
@@ -214,7 +243,10 @@ export default function Employees() {
                 </SelectContent>
               </Select>
 
-              <Select value={filterDeduction} onValueChange={setFilterDeduction}>
+              <Select
+                value={filterDeduction}
+                onValueChange={setFilterDeduction}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="All Types" />
                 </SelectTrigger>
@@ -226,8 +258,8 @@ export default function Employees() {
               </Select>
             </div>
 
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => {
                 setSearch("");
                 setFilterDepartment("all");
@@ -246,7 +278,9 @@ export default function Employees() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Employee</TableHead>
-                  <TableHead className="hidden sm:table-cell">Department</TableHead>
+                  <TableHead className="hidden sm:table-cell">
+                    Department
+                  </TableHead>
                   <TableHead className="hidden md:table-cell">Role</TableHead>
                   <TableHead>Salary</TableHead>
                   <TableHead className="hidden lg:table-cell">Leaves</TableHead>
@@ -260,31 +294,56 @@ export default function Employees() {
                     <TableCell>
                       <div className="flex items-center space-x-3">
                         <div className="w-10 h-10 bg-linear-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
-                          {emp.name.split(' ').map((n:any) => n[0]).join('').toUpperCase()}
+                          {`${emp.firstName?.[0] || ""}${
+                            emp.lastName?.[0] || ""
+                          }`.toUpperCase()}
                         </div>
                         <div>
-                          <div className="font-medium text-gray-900">{emp.name}</div>
-                          <div className="text-sm text-gray-500">{emp.employeeId}</div>
+                          <div className="font-medium text-gray-900">
+                            {`${emp.firstName || ""} ${
+                              emp.lastName || ""
+                            }`.trim()}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {emp.employeeId}
+                          </div>
                         </div>
                       </div>
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">
-                      <Badge variant="outline" className={getDepartmentColor(emp.department)}>
+                      <Badge
+                        variant="outline"
+                        className={getDepartmentColor(emp.department)}
+                      >
                         {emp.department || "-"}
                       </Badge>
                     </TableCell>
-                    <TableCell className="hidden md:table-cell">{emp.role || "-"}</TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      {emp.role || "-"}
+                    </TableCell>
                     <TableCell>
-                      <div className="font-semibold">₹{emp.baseSalary?.toLocaleString()}</div>
-                      <div className="text-xs text-gray-500 capitalize">{emp.deductionType}</div>
+                      <div className="font-semibold">
+                        ₹{emp.baseSalary?.toLocaleString()}
+                      </div>
+                      <div className="text-xs text-gray-500 capitalize">
+                        {emp.deductionType}
+                      </div>
                     </TableCell>
                     <TableCell className="hidden lg:table-cell">
                       <div className="text-sm">
                         <div className="flex items-center space-x-2">
-                          <span className="text-blue-600">C: {emp.casualLeavesUsed || 0}/{emp.casualLeavesTotal || 4}</span>
-                          <span className="text-green-600">S: {emp.sickLeavesUsed || 0}/{emp.sickLeavesTotal || 2}</span>
+                          <span className="text-blue-600">
+                            C: {emp.casualLeavesUsed || 0}/
+                            {emp.casualLeavesTotal || 4}
+                          </span>
+                          <span className="text-green-600">
+                            S: {emp.sickLeavesUsed || 0}/
+                            {emp.sickLeavesTotal || 2}
+                          </span>
                         </div>
-                        <div className="text-xs text-gray-500">Remaining: {emp.leavesRemaining}</div>
+                        <div className="text-xs text-gray-500">
+                          Remaining: {emp.leavesRemaining}
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
@@ -304,13 +363,20 @@ export default function Employees() {
 
                 {paginated.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                    <TableCell
+                      colSpan={6}
+                      className="text-center py-8 text-gray-500"
+                    >
                       <div className="flex flex-col items-center space-y-2">
                         <div className="text-4xl">👥</div>
-                        <p className="text-lg font-medium">No employees found</p>
+                        <p className="text-lg font-medium">
+                          No employees found
+                        </p>
                         <p className="text-sm">
-                          {search || filterDepartment !== "all" || filterDeduction !== "all" 
-                            ? "Try adjusting your filters" 
+                          {search ||
+                          filterDepartment !== "all" ||
+                          filterDeduction !== "all"
+                            ? "Try adjusting your filters"
                             : "No employees in the system"}
                         </p>
                       </div>
@@ -325,19 +391,21 @@ export default function Employees() {
           {totalPages > 1 && (
             <div className="flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0 pt-4 border-t">
               <div className="text-sm text-gray-600">
-                Showing {((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, filtered.length)} of {filtered.length} employees
+                Showing {(page - 1) * pageSize + 1} to{" "}
+                {Math.min(page * pageSize, filtered.length)} of{" "}
+                {filtered.length} employees
               </div>
-              
+
               <div className="flex items-center space-x-2">
-                <Button 
-                  variant="outline" 
-                  onClick={prev} 
+                <Button
+                  variant="outline"
+                  onClick={prev}
                   disabled={page === 1}
                   size="sm"
                 >
                   Previous
                 </Button>
-                
+
                 <div className="flex items-center space-x-1">
                   {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                     const pageNum = i + 1;
@@ -355,10 +423,10 @@ export default function Employees() {
                   })}
                   {totalPages > 5 && <span className="px-2">...</span>}
                 </div>
-                
-                <Button 
-                  variant="outline" 
-                  onClick={next} 
+
+                <Button
+                  variant="outline"
+                  onClick={next}
                   disabled={page === totalPages}
                   size="sm"
                 >

@@ -10,14 +10,15 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { getMyProfile, updateEmployee } from "@/api/employees";
 
-export default function EmployeeRegistration() {
-  const { user, register, isAuthenticated, logout } = useAuth();
+export default function EditProfile() {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [hasExistingProfile, setHasExistingProfile] = useState(false);
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -33,31 +34,8 @@ export default function EmployeeRegistration() {
     panNumber: "",
     uanNumber: "",
   });
-
-  // Check if user already has an employeeId and redirect to profile
-  useEffect(() => {
-    if (isAuthenticated && user?.employeeId) {
-      console.log("User already has employeeId, redirecting to profile");
-      navigate("/my-profile", { replace: true });
-      return;
-    }
-    
-    // If user is authenticated but doesn't have employeeId, they need to register
-    if (isAuthenticated && user && !user.employeeId) {
-      console.log("User authenticated but needs registration");
-      setHasExistingProfile(false);
-    }
-  }, [user, isAuthenticated, navigate]);
-
-  // Auto-fill personal email with company email
-  useEffect(() => {
-    if (user?.email && !formData.personalEmail) {
-      setFormData(prev => ({
-        ...prev,
-        personalEmail: user.email || ""
-      }));
-    }
-  }, [user?.email, formData.personalEmail]);
+  
+  const [loading, setLoading] = useState(true);
 
   const departments = [
     "HR",
@@ -68,67 +46,73 @@ export default function EmployeeRegistration() {
     "Utility",
   ];
 
+  useEffect(() => {
+    const fetchProfileData = async () => {
+      try {
+        const employeeData = await getMyProfile();
+        
+        if (employeeData) {
+          setFormData({
+            firstName: employeeData.firstName || "",
+            lastName: employeeData.lastName || "",
+            personalEmail: employeeData.personal_email || "",
+            contactNumber: employeeData.contact_number || "",
+            dateOfBirth: employeeData.date_of_birth || "",
+            gender: employeeData.gender || "",
+            address: employeeData.address || "",
+            designation: employeeData.designation || "",
+            department: employeeData.department || "",
+            accountNumber: employeeData.account_number || "",
+            ifscCode: employeeData.ifsc_code || "",
+            panNumber: employeeData.pan_number || "",
+            uanNumber: employeeData.uan_number || "",
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching profile:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProfileData();
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate required fields
-    if (!formData.firstName || !formData.lastName || !formData.department) {
-      alert("Please fill in all required fields: First Name, Last Name, and Department");
+    if (!user?.employeeId) {
+      alert("No employee ID found. Please log in again.");
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      const registrationData = {
-        action: 'register',
+      const updateData = {
         firstName: formData.firstName,
         lastName: formData.lastName,
-        company_email: user?.email || '',
-        password: "temp123", // Temporary password - backend should handle this
-        department: formData.department,
-        designation: formData.designation || "",
         personal_email: formData.personalEmail || "",
         contact_number: formData.contactNumber || "",
         date_of_birth: formData.dateOfBirth || "",
         gender: formData.gender || "",
         address: formData.address || "",
+        designation: formData.designation || "",
+        department: formData.department || "",
         account_number: formData.accountNumber || "",
         ifsc_code: formData.ifscCode || "",
         pan_number: formData.panNumber || "",
         uan_number: formData.uanNumber || "",
       };
 
-      console.log("📤 Sending registration data:", registrationData);
-
-      // Call the register function from AuthContext
-      const result = await register(registrationData);
-      console.log("✅ Registration successful:", result);
-
-      if (result.employee) {
-        // Update localStorage with new employee data
-        const currentUser = localStorage.getItem('user');
-        if (currentUser) {
-          const parsedUser = JSON.parse(currentUser);
-          const updatedUser = {
-            ...parsedUser,
-            ...result.employee,
-            employeeId: result.employee.id || result.employee.employeeId
-          };
-          localStorage.setItem('user', JSON.stringify(updatedUser));
-        }
-        
-        // Force a page reload to update auth state
-        alert("Registration completed successfully! You will be redirected to your profile.");
-        window.location.href = '/my-profile';
-      } else {
-        alert("Registration successful but no employee data returned. Please log in again.");
-        logout();
-      }
+      await updateEmployee(user.employeeId, updateData);
+      
+      alert("Profile updated successfully!");
+      navigate('/my-profile');
       
     } catch (error: any) {
-      console.error("❌ Registration error:", error);
-      alert(`Error saving registration: ${error.message}`);
+      console.error("❌ Update error:", error);
+      alert(`Error updating profile: ${error.message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -141,36 +125,13 @@ export default function EmployeeRegistration() {
     }));
   };
 
-  if (!isAuthenticated) {
+  if (loading) {
     return (
-      <Card className="w-full max-w-2xl mx-auto">
-        <CardContent className="p-6 text-center">
-          <p className="text-lg text-gray-600">
-            Please sign in to complete your registration.
-          </p>
-          <Button 
-            className="mt-4 bg-blue-600 hover:bg-blue-700"
-            onClick={() => navigate("/login")}
-          >
-            Go to Login
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  // If user already has a profile, show redirect message
-  if (hasExistingProfile) {
-    return (
-      <div className="max-w-2xl mx-auto p-4">
-        <Card>
-          <CardContent className="p-6 text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-lg text-gray-600">
-              You already have a profile. Redirecting...
-            </p>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading profile data...</p>
+        </div>
       </div>
     );
   }
@@ -179,32 +140,24 @@ export default function EmployeeRegistration() {
     <div className="max-w-4xl mx-auto space-y-6 p-4">
       <div className="text-center">
         <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
-          Complete Your Profile
+          Edit Profile
         </h1>
         <p className="text-gray-600 mt-2">
-          Welcome to JHEX! Please complete your employee profile to continue.
+          Update your personal and professional information
         </p>
-        <div className="mt-4 text-sm">
-          <p className="text-blue-600">
-            Logged in as: <strong>{user?.email}</strong>
-          </p>
-          <p className="text-gray-500 mt-1">
-            Employee ID will be generated after registration
-          </p>
-        </div>
       </div>
 
       <Card>
         <CardHeader>
           <div className="flex justify-between items-center">
-            <CardTitle>Employee Registration Form</CardTitle>
+            <CardTitle>Edit Profile Information</CardTitle>
             <Button
               variant="outline"
               size="sm"
               onClick={() => navigate('/my-profile')}
               className="text-sm"
             >
-              Check Profile
+              Back to Profile
             </Button>
           </div>
         </CardHeader>
@@ -262,9 +215,6 @@ export default function EmployeeRegistration() {
                     placeholder="john.doe@personal.com"
                     disabled={isSubmitting}
                   />
-                  <p className="text-xs text-gray-500">
-                    Optional: Different from your company email
-                  </p>
                 </div>
 
                 <div className="space-y-2">
@@ -317,12 +267,13 @@ export default function EmployeeRegistration() {
 
               <div className="space-y-2">
                 <Label htmlFor="address">Address</Label>
-                <Input
+                <Textarea
                   id="address"
                   value={formData.address}
-                  onChange={(e) => handleChange("address", e.target.value)}
+                  onChange={(e: { target: { value: string; }; }) => handleChange("address", e.target.value)}
                   placeholder="123 Street, City, State, PIN Code"
                   disabled={isSubmitting}
+                  rows={3}
                 />
               </div>
             </div>
@@ -331,9 +282,6 @@ export default function EmployeeRegistration() {
             <div className="space-y-4 border-t pt-6">
               <div className="flex items-center gap-2">
                 <h3 className="text-lg font-semibold">Employment Details</h3>
-                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                  Required
-                </span>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -351,13 +299,10 @@ export default function EmployeeRegistration() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="department">
-                    Department <span className="text-red-500">*</span>
-                  </Label>
+                  <Label htmlFor="department">Department</Label>
                   <Select
                     value={formData.department}
                     onValueChange={(value) => handleChange("department", value)}
-                    required
                     disabled={isSubmitting}
                   >
                     <SelectTrigger>
@@ -379,13 +324,7 @@ export default function EmployeeRegistration() {
             <div className="space-y-4 border-t pt-6">
               <div className="flex items-center gap-2">
                 <h3 className="text-lg font-semibold">Bank & Government Details</h3>
-                <span className="text-xs bg-gray-100 text-gray-800 px-2 py-1 rounded">
-                  Optional
-                </span>
               </div>
-              <p className="text-sm text-gray-500">
-                These details can be added or updated later in your profile
-              </p>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -440,13 +379,13 @@ export default function EmployeeRegistration() {
 
             <div className="flex flex-col sm:flex-row justify-between items-center pt-6 border-t gap-4">
               <div className="text-sm text-gray-500">
-                <p>All required fields must be completed to continue.</p>
+                <p>Fields marked with * are required</p>
               </div>
               <div className="flex gap-3">
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => navigate('/')}
+                  onClick={() => navigate('/my-profile')}
                   disabled={isSubmitting}
                 >
                   Cancel
@@ -462,7 +401,7 @@ export default function EmployeeRegistration() {
                       Saving...
                     </>
                   ) : (
-                    "Complete Registration"
+                    "Save Changes"
                   )}
                 </Button>
               </div>
@@ -470,18 +409,6 @@ export default function EmployeeRegistration() {
           </form>
         </CardContent>
       </Card>
-
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h3 className="font-semibold text-blue-800 flex items-center gap-2">
-          <span>💡</span> Need Help?
-        </h3>
-        <ul className="mt-2 text-sm text-blue-700 space-y-1">
-          <li>• Fill in all required fields marked with *</li>
-          <li>• You can update your information later in your profile</li>
-          <li>• Contact HR if you need assistance with any field</li>
-          <li>• Make sure your personal email is correct for communication</li>
-        </ul>
-      </div>
     </div>
   );
 }
