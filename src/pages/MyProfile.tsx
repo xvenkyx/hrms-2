@@ -7,7 +7,7 @@ import { getMyProfile } from "@/api/employees";
 import { useNavigate } from "react-router-dom";
 
 export default function MyProfile() {
-  const { user, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [employeeData, setEmployeeData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
