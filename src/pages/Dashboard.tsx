@@ -286,24 +286,24 @@ export default function Dashboard() {
   }
 
   // Format birthday display
-  function formatBirthdayDisplay(birthday: Birthday): string {
-    const birthDate = new Date(birthday.date);
-    const today = new Date();
-    const nextBirthday = new Date(
-      today.getFullYear(),
-      birthDate.getMonth(),
-      birthDate.getDate()
-    );
+  // function formatBirthdayDisplay(birthday: Birthday): string {
+  //   const birthDate = new Date(birthday.date);
+  //   const today = new Date();
+  //   const nextBirthday = new Date(
+  //     today.getFullYear(),
+  //     birthDate.getMonth(),
+  //     birthDate.getDate()
+  //   );
 
-    if (nextBirthday.getDate() === today.getDate() && 
-        nextBirthday.getMonth() === today.getMonth()) {
-      return "🎉 Today!";
-    } else if (birthday.daysUntil === 1) {
-      return "🎂 Tomorrow";
-    } else {
-      return `🎂 In ${birthday.daysUntil} days`;
-    }
-  }
+  //   if (nextBirthday.getDate() === today.getDate() && 
+  //       nextBirthday.getMonth() === today.getMonth()) {
+  //     return "🎉 Today!";
+  //   } else if (birthday.daysUntil === 1) {
+  //     return "🎂 Tomorrow";
+  //   } else {
+  //     return `🎂 In ${birthday.daysUntil} days`;
+  //   }
+  // }
 
   // Render different dashboards based on role
   if (loading) {
