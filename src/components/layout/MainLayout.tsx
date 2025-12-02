@@ -30,17 +30,17 @@ export default function MainLayout() {
     { name: "Attendance", path: "/attendance", icon: "📅" },
   ];
 
-  const employeeMenu = [
-    { name: "My Profile", path: "/my-profile", icon: "👤" },
-    { name: "Leave Requests", path: "/leave-requests", icon: "📋" },
-  ];
+  // const employeeMenu = [
+  //   { name: "My Profile", path: "/my-profile", icon: "👤" },
+  //   { name: "Leave Requests", path: "/leave-requests", icon: "📋" },
+  // ];
 
-  const adminMenu = [
-    { name: "Employees", path: "/employees", icon: "👥" },
-    { name: "Settings", path: "/settings", icon: "⚙️" },
-    { name: "Generate Slip", path: "/generate-slip", icon: "💰" },
-    { name: "Salary History", path: "/salary-history", icon: "📈" },
-  ];
+  // const adminMenu = [
+  //   { name: "Employees", path: "/employees", icon: "👥" },
+  //   { name: "Settings", path: "/settings", icon: "⚙️" },
+  //   { name: "Generate Slip", path: "/generate-slip", icon: "💰" },
+  //   { name: "Salary History", path: "/salary-history", icon: "📈" },
+  // ];
 
   const getMenu = () => {
     if (!isAuthenticated || !user) return [];

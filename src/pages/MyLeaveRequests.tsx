@@ -22,7 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
+// import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -90,12 +90,12 @@ const MyLeaveRequests: React.FC = () => {
     reason: "",
   });
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
-  const [showDateSelector, setShowDateSelector] = useState(false);
+  // const [showDateSelector, setShowDateSelector] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [hasPending, setHasPending] = useState(false);
   const [formError, setFormError] = useState("");
-  const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
+  const [, setDateRange] = useState<{ from?: Date; to?: Date }>({});
 
   useEffect(() => {
     fetchData();
