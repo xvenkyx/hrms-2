@@ -7,13 +7,13 @@ const getAuthHeaders = () => {
   const token = localStorage.getItem("sessionToken");
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    "Accept": "application/json"
+    Accept: "application/json",
   };
-  
+
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
   }
-  
+
   return headers;
 };
 
@@ -52,58 +52,57 @@ export async function getEmployeeById(employeeId: string): Promise<any | null> {
 
 export async function getMyProfile(): Promise<any> {
   try {
-    const sessionToken = localStorage.getItem('sessionToken');
-    
+    const sessionToken = localStorage.getItem("sessionToken");
+
     if (!sessionToken) {
       console.log("❌ No session token found");
-      window.location.href = '/login';
+      window.location.href = "/login";
       return null;
     }
 
     console.log("🔍 Using /auth endpoint to get profile");
-    
+
     // Use /auth endpoint with validate action (this works!)
     const response = await fetch(`${API_BASE}/auth`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
+        "Content-Type": "application/json",
+        Accept: "application/json",
       },
       body: JSON.stringify({
-        action: 'validate',
-        sessionToken: sessionToken
-      })
+        action: "validate",
+        sessionToken: sessionToken,
+      }),
     });
 
     console.log("📥 Response status:", response.status);
-    
+
     if (!response.ok) {
       console.error("❌ Auth validation failed:", response.status);
-      localStorage.removeItem('sessionToken');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+      localStorage.removeItem("sessionToken");
+      localStorage.removeItem("user");
+      window.location.href = "/login";
       return null;
     }
-    
+
     const data = await response.json();
     console.log("✅ Auth response received:", data);
-    
+
     if (data.valid && data.employee) {
       console.log("✅ Employee data found");
       return data.employee;
     } else {
       console.error("❌ Invalid session or no employee data");
-      localStorage.removeItem('sessionToken');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+      localStorage.removeItem("sessionToken");
+      localStorage.removeItem("user");
+      window.location.href = "/login";
       return null;
     }
-    
   } catch (error) {
     console.error("❌ Error fetching profile:", error);
-    localStorage.removeItem('sessionToken');
-    localStorage.removeItem('user');
-    window.location.href = '/login';
+    localStorage.removeItem("sessionToken");
+    localStorage.removeItem("user");
+    window.location.href = "/login";
     return null;
   }
 }
@@ -139,7 +138,9 @@ export async function updateEmployee(
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Failed to update employee: ${response.status} ${errorText}`);
+    throw new Error(
+      `Failed to update employee: ${response.status} ${errorText}`
+    );
   }
 
   return response.json();
@@ -158,7 +159,6 @@ export async function deleteEmployee(employeeId: string): Promise<any> {
   return response.json();
 }
 
-
 // Add these functions to your existing employees.ts file
 
 // ==================== LEAVE REQUEST FUNCTIONS ====================
@@ -169,7 +169,7 @@ export async function deleteEmployee(employeeId: string): Promise<any> {
 export async function submitLeaveRequest(leaveData: {
   yearMonth: string;
   days: number;
-  leaveType: 'casual' | 'sick' | 'earned';
+  leaveType: "casual" | "sick" | "earned";
   reason?: string;
 }): Promise<{ message: string; request: any }> {
   const response = await fetch(`${API_BASE}/leave-requests`, {
@@ -191,27 +191,56 @@ export async function submitLeaveRequest(leaveData: {
 /**
  * Get current user's leave requests
  */
+/**
+ * Get current user's leave requests
+ */
+/**
+ * Get current user's leave requests
+ */
 export async function getMyLeaveRequests(): Promise<any[]> {
-  const response = await fetch(`${API_BASE}/my-leave-requests`, {
-    headers: getAuthHeaders(),
-  });
+  try {
+    // First get the employee profile to get employeeId
+    const profile = await getMyProfile();
+    if (!profile || !profile.employeeId) {
+      throw new Error("Unable to load employee profile");
+    }
 
-  if (!response.ok) {
-    throw new Error("Failed to fetch leave requests");
+    const employeeId = profile.employeeId;
+    console.log("Getting leave requests for employee:", employeeId);
+
+    // Call the API with employeeId as query parameter
+    const response = await fetch(
+      `${API_BASE}/my-leave-requests?employeeId=${encodeURIComponent(
+        employeeId
+      )}`,
+      {
+        headers: getAuthHeaders(),
+        method: "GET",
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("API Error Response:", errorText);
+      throw new Error("Failed to fetch leave requests");
+    }
+
+    const data = await response.json();
+    return data.requests || [];
+  } catch (error) {
+    console.error("Error in getMyLeaveRequests:", error);
+    throw error;
   }
-
-  const data = await response.json();
-  return data.requests || [];
 }
 
 /**
  * Get all leave requests (for HR/Admin)
  */
 export async function getAllLeaveRequests(status?: string): Promise<any[]> {
-  const url = status 
+  const url = status
     ? `${API_BASE}/leave-requests?status=${status}`
     : `${API_BASE}/leave-requests`;
-    
+
   const response = await fetch(url, {
     headers: getAuthHeaders(),
   });
@@ -228,14 +257,14 @@ export async function getAllLeaveRequests(status?: string): Promise<any[]> {
  * Approve or reject a leave request (for HR/Admin)
  */
 export async function processLeaveRequest(
-  requestId: string, 
-  action: 'approve' | 'reject',
+  requestId: string,
+  action: "approve" | "reject",
   comments?: string
 ): Promise<{ message: string; requestId: string; status: string }> {
   const response = await fetch(`${API_BASE}/leave-requests/${requestId}`, {
     method: "PUT",
     headers: getAuthHeaders(),
-    body: JSON.stringify({ action, comments: comments || '' }),
+    body: JSON.stringify({ action, comments: comments || "" }),
   });
 
   if (!response.ok) {
@@ -251,20 +280,24 @@ export async function processLeaveRequest(
 /**
  * Check if user has pending leave request for a specific month
  */
-export async function hasPendingLeaveForMonth(yearMonth: string): Promise<boolean> {
+export async function hasPendingLeaveForMonth(
+  yearMonth: string
+): Promise<boolean> {
   try {
     const myRequests = await getMyLeaveRequests();
     return myRequests.some(
-      (request) => 
-        request.yearMonth === yearMonth && 
-        request.status === 'pending'
+      (request) =>
+        request.yearMonth === yearMonth && request.status === "pending"
     );
   } catch (error) {
-    console.error('Error checking pending leaves:', error);
+    console.error("Error checking pending leaves:", error);
     return false;
   }
 }
 
+/**
+ * Get leave statistics for current user
+ */
 /**
  * Get leave statistics for current user
  */
@@ -279,34 +312,38 @@ export async function getMyLeaveStats(): Promise<{
   approvedRequests: number;
 }> {
   try {
-    // Get employee profile
+    // Get employee profile and leave requests
     const profile = await getMyProfile();
     const myRequests = await getMyLeaveRequests();
-    
-    const pendingRequests = myRequests.filter(r => r.status === 'pending').length;
-    const approvedRequests = myRequests.filter(r => r.status === 'approved').length;
-    
+
+    const pendingRequests = myRequests.filter(
+      (r) => r.status === "pending"
+    ).length;
+    const approvedRequests = myRequests.filter(
+      (r) => r.status === "approved"
+    ).length;
+
     return {
       totalLeaves: profile?.totalLeaves || 0,
       leavesRemaining: profile?.leavesRemaining || 0,
       casualLeavesUsed: profile?.casualLeavesUsed || 0,
-      casualLeavesTotal: profile?.casualLeavesTotal || 0,
+      casualLeavesTotal: profile?.casualLeavesTotal || 4, // Default to 4 if not set
       sickLeavesUsed: profile?.sickLeavesUsed || 0,
-      sickLeavesTotal: profile?.sickLeavesTotal || 0,
+      sickLeavesTotal: profile?.sickLeavesTotal || 2, // Default to 2 if not set
       pendingRequests,
-      approvedRequests
+      approvedRequests,
     };
   } catch (error) {
-    console.error('Error getting leave stats:', error);
+    console.error("Error getting leave stats:", error);
     return {
       totalLeaves: 0,
       leavesRemaining: 0,
       casualLeavesUsed: 0,
-      casualLeavesTotal: 0,
+      casualLeavesTotal: 4,
       sickLeavesUsed: 0,
-      sickLeavesTotal: 0,
+      sickLeavesTotal: 2,
       pendingRequests: 0,
-      approvedRequests: 0
+      approvedRequests: 0,
     };
   }
 }

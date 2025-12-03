@@ -469,9 +469,9 @@ const MyLeaveRequests: React.FC = () => {
                         <Calendar
                           mode="single"
                           selected={formData.startDate}
-                          onSelect={(date) => handleDateSelect(date)}
+                          onSelect={(date: Date | undefined) => handleDateSelect(date)}
                           initialFocus
-                          disabled={(date) => date < new Date()}
+                          disabled={(date: Date | undefined) => date! < new Date()}
                         />
                       </PopoverContent>
                     </Popover>
@@ -502,12 +502,12 @@ const MyLeaveRequests: React.FC = () => {
                         <Calendar
                           mode="single"
                           selected={formData.endDate}
-                          onSelect={(date) => handleDateSelect(date)}
+                          onSelect={(date: Date | undefined) => handleDateSelect(date)}
                           initialFocus
-                          disabled={(date) => {
-                            const isPastDate = date < new Date();
+                          disabled={(date: Date | undefined) => {
+                            const isPastDate = date! < new Date();
                             const isBeforeStartDate = formData.startDate
-                              ? date < formData.startDate
+                              ? date! < formData.startDate
                               : false;
                             return isPastDate || isBeforeStartDate;
                           }}
