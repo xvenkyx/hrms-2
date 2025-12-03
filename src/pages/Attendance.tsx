@@ -1,290 +1,417 @@
-import { useEffect, useState, useMemo } from "react"
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
-import { Calendar } from "@/components/ui/calendar"
-import { Progress } from "@/components/ui/progress"
-import { useAuth } from "@/context/AuthContext"
-import { 
-  checkIn, 
-  checkOut, 
-  getMyAttendance, 
+import {
+  checkIn,
+  checkOut,
   getAttendanceDashboard,
-  getEmployeeAttendance 
-} from "@/api/attendance"
-import { fetchEmployees } from "@/api/employees"
+  getEmployeeAttendance,
+  getMyAttendance,
+} from "@/api/attendance";
+import { fetchEmployees } from "@/api/employees";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from "@/context/AuthContext";
+import { useEffect, useMemo, useState } from "react";
 
-// Helper to convert UTC to EST with DST awareness
-function toEST(date: Date): Date {
-  const utcDate = new Date(date.toISOString());
-  // EST is UTC-5, EDT is UTC-4
-  const isDST = () => {
-    const year = utcDate.getUTCFullYear();
-    // DST: Second Sunday in March to First Sunday in November
-    const march = new Date(Date.UTC(year, 2, 8)); // March 8th
-    const november = new Date(Date.UTC(year, 10, 1)); // November 1st
-    
-    // Find second Sunday in March
-    while (march.getUTCDay() !== 0) march.setUTCDate(march.getUTCDate() + 1);
-    march.setUTCDate(march.getUTCDate() + 7);
-    
-    // Find first Sunday in November
-    while (november.getUTCDay() !== 0) november.setUTCDate(november.getUTCDate() + 1);
-    
-    return utcDate >= march && utcDate < november;
-  };
-  
-  const offset = isDST() ? -4 : -5;
-  utcDate.setUTCHours(utcDate.getUTCHours() + offset);
-  return utcDate;
-}
-
-function formatESTTime(date: Date): string {
-  const estDate = toEST(date);
-  return estDate.toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
+// Get current EST time string
+function getCurrentESTTime(): string {
+  const now = new Date();
+  return now.toLocaleTimeString("en-US", {
+    timeZone: "America/New_York",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
     hour12: true,
-    timeZone: 'America/New_York'
   });
 }
 
-function formatESTDate(date: Date): string {
-  const estDate = toEST(date);
-  return estDate.toLocaleDateString('en-US', {
-    weekday: 'short',
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    timeZone: 'America/New_York'
-  });
-}
-
+// Get current EST date string
 function getCurrentESTDate(): string {
   const now = new Date();
-  const estDate = toEST(now);
-  return estDate.toISOString().split('T')[0]; // YYYY-MM-DD
+  return now.toLocaleDateString("en-US", {
+    timeZone: "America/New_York",
+    weekday: "short",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }
 
-function isWorkingHours(): boolean {
+// Format any date to EST time
+function formatESTTime(date: Date): string {
+  return date.toLocaleTimeString("en-US", {
+    timeZone: "America/New_York",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
+}
+
+// Format any date to EST date
+function formatESTDate(date: Date): string {
+  return date.toLocaleDateString("en-US", {
+    timeZone: "America/New_York",
+    weekday: "short",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+// Get YYYY-MM-DD format in EST
+// function getCurrentESTDateForAPI(): string {
+//   const now = new Date();
+//   const year = now.toLocaleDateString("en-US", {
+//     timeZone: "America/New_York",
+//     year: "numeric",
+//   });
+//   const month = now.toLocaleDateString("en-US", {
+//     timeZone: "America/New_York",
+//     month: "2-digit",
+//   });
+//   const day = now.toLocaleDateString("en-US", {
+//     timeZone: "America/New_York",
+//     day: "2-digit",
+//   });
+//   return `${year}-${month}-${day}`;
+// }
+
+// Check if current time is within EST working hours
+function isWorkingHoursEST(): boolean {
   const now = new Date();
-  const estDate = toEST(now);
-  const hours = estDate.getHours();
-  const minutes = estDate.getMinutes();
-  const totalMinutes = hours * 60 + minutes;
-  
-  // 9:00 AM to 6:00 PM EST
-  const start = 9 * 60; // 9:00 AM
-  const end = 18 * 60; // 6:00 PM
-  
+
+  // Get hours in EST
+  const estHour = parseInt(
+    now.toLocaleTimeString("en-US", {
+      timeZone: "America/New_York",
+      hour: "2-digit",
+      hour12: false,
+    })
+  );
+
+  const estMinute = parseInt(
+    now.toLocaleTimeString("en-US", {
+      timeZone: "America/New_York",
+      minute: "2-digit",
+    })
+  );
+
+  const totalMinutes = estHour * 60 + estMinute;
+
+  // Working hours: 9:00 AM to 6:00 PM EST
+  const start = 9 * 60; // 9:00 AM = 540 minutes
+  const end = 18 * 60; // 6:00 PM = 1080 minutes
+
   return totalMinutes >= start && totalMinutes <= end;
 }
 
-function calculateWorkingHours(checkin: string, checkout: string | null): string {
+// Calculate working hours between checkin and checkout
+function calculateWorkingHours(
+  checkin: string,
+  checkout: string | null
+): string {
   if (!checkout) return "Still working";
-  
+
   const checkinDate = new Date(checkin);
   const checkoutDate = new Date(checkout);
   const diffMs = checkoutDate.getTime() - checkinDate.getTime();
-  
+
   const hours = Math.floor(diffMs / (1000 * 60 * 60));
   const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-  
+
   return `${hours}h ${minutes}m`;
 }
 
-function getAttendanceStatus(checkin: string, checkout: string | null): {
+// Get attendance status based on check-in/check-out times
+function getAttendanceStatus(
+  checkin: string,
+  checkout: string | null
+): {
   status: "present" | "absent" | "half-day" | "on-leave";
   label: string;
   color: string;
 } {
-  if (!checkin) return { status: "absent", label: "Absent", color: "bg-red-100 text-red-800" };
-  
+  if (!checkin)
+    return {
+      status: "absent",
+      label: "Absent",
+      color: "bg-red-100 text-red-800",
+    };
+
   const checkinDate = new Date(checkin);
-  const estCheckin = toEST(checkinDate);
-  const checkinHour = estCheckin.getHours();
-  
-  // Late after 9:30 AM
-  if (checkinHour > 9 || (checkinHour === 9 && estCheckin.getMinutes() > 30)) {
-    if (!checkout) return { status: "present", label: "Present (Late)", color: "bg-yellow-100 text-yellow-800" };
-    
+
+  // Get check-in time in EST
+  const checkinHour = parseInt(
+    checkinDate.toLocaleTimeString("en-US", {
+      timeZone: "America/New_York",
+      hour: "2-digit",
+      hour12: false,
+    })
+  );
+
+  const checkinMinute = parseInt(
+    checkinDate.toLocaleTimeString("en-US", {
+      timeZone: "America/New_York",
+      minute: "2-digit",
+    })
+  );
+
+  // Late after 9:30 AM EST
+  if (checkinHour > 9 || (checkinHour === 9 && checkinMinute > 30)) {
+    if (!checkout)
+      return {
+        status: "present",
+        label: "Present (Late)",
+        color: "bg-yellow-100 text-yellow-800",
+      };
+
     const checkoutDate = new Date(checkout);
     const diffMs = checkoutDate.getTime() - checkinDate.getTime();
     const hours = diffMs / (1000 * 60 * 60);
-    
+
     if (hours < 8) {
-      return { status: "half-day", label: "Half Day", color: "bg-orange-100 text-orange-800" };
+      return {
+        status: "half-day",
+        label: "Half Day",
+        color: "bg-orange-100 text-orange-800",
+      };
     }
-    return { status: "present", label: "Present (Late)", color: "bg-yellow-100 text-yellow-800" };
+    return {
+      status: "present",
+      label: "Present (Late)",
+      color: "bg-yellow-100 text-yellow-800",
+    };
   }
-  
-  if (!checkout) return { status: "present", label: "Present", color: "bg-green-100 text-green-800" };
-  
+
+  if (!checkout)
+    return {
+      status: "present",
+      label: "Present",
+      color: "bg-green-100 text-green-800",
+    };
+
   const checkoutDate = new Date(checkout);
   const diffMs = checkoutDate.getTime() - checkinDate.getTime();
   const hours = diffMs / (1000 * 60 * 60);
-  
+
   if (hours < 8) {
-    return { status: "half-day", label: "Half Day", color: "bg-orange-100 text-orange-800" };
+    return {
+      status: "half-day",
+      label: "Half Day",
+      color: "bg-orange-100 text-orange-800",
+    };
   }
-  
-  return { status: "present", label: "Present", color: "bg-green-100 text-green-800" };
+
+  return {
+    status: "present",
+    label: "Present",
+    color: "bg-green-100 text-green-800",
+  };
 }
 
+// Helper to convert date to EST Date object (if needed for calculations)
+// function toESTDate(date: Date): Date {
+//   const estDateStr = date.toLocaleString("en-US", {
+//     timeZone: "America/New_York",
+//   });
+//   return new Date(estDateStr);
+// }
+
+// // Helper to get hours from Date in EST
+// function getHoursInEST(date: Date): number {
+//   return parseInt(
+//     date.toLocaleTimeString("en-US", {
+//       timeZone: "America/New_York",
+//       hour: "2-digit",
+//       hour12: false,
+//     })
+//   );
+// }
+
+// // Helper to get minutes from Date in EST
+// function getMinutesInEST(date: Date): number {
+//   return parseInt(
+//     date.toLocaleTimeString("en-US", {
+//       timeZone: "America/New_York",
+//       minute: "2-digit",
+//     })
+//   );
+// }
+
 export default function Attendance() {
-  const { user } = useAuth()
-  const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState("my-attendance")
-  const [myAttendance, setMyAttendance] = useState<any[]>([])
-  const [dashboard, setDashboard] = useState<any>(null)
-  const [employees, setEmployees] = useState<any[]>([])
-  const [selectedEmployee, setSelectedEmployee] = useState<string>("")
-  const [employeeAttendance, setEmployeeAttendance] = useState<any[]>([])
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date())
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("my-attendance");
+  const [myAttendance, setMyAttendance] = useState<any[]>([]);
+  const [dashboard, setDashboard] = useState<any>(null);
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [selectedEmployee, setSelectedEmployee] = useState<string>("");
+  const [employeeAttendance, setEmployeeAttendance] = useState<any[]>([]);
+  const [] = useState<Date | undefined>(new Date());
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-    to: new Date()
-  })
+    to: new Date(),
+  });
 
   const [checkinStatus, setCheckinStatus] = useState<{
     hasCheckedIn: boolean;
     checkinTime?: string;
     checkinId?: string;
-  }>({ hasCheckedIn: false })
+  }>({ hasCheckedIn: false });
 
   // Current EST time display
-  const [currentTime, setCurrentTime] = useState<string>("")
-  const [currentDate, setCurrentDate] = useState<string>("")
+  const [currentTime, setCurrentTime] = useState<string>("");
+  const [currentDate, setCurrentDate] = useState<string>("");
 
+  // In your useEffect:
   useEffect(() => {
-    // Update current EST time every second
     const timer = setInterval(() => {
-      const now = new Date();
-      setCurrentTime(formatESTTime(now));
-      setCurrentDate(formatESTDate(now));
+      setCurrentTime(getCurrentESTTime());
+      setCurrentDate(getCurrentESTDate());
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [])
+  }, []);
 
   useEffect(() => {
-    loadData()
-  }, [activeTab, selectedEmployee, dateRange])
+    loadData();
+  }, [activeTab, selectedEmployee, dateRange]);
 
   async function loadData() {
-    setLoading(true)
+    setLoading(true);
     try {
-      if (user?.role === 'employee') {
+      if (user?.role === "employee") {
         // For employees, show their attendance
         const [attendance, todayStatus] = await Promise.all([
-          getMyAttendance(dateRange.from.toISOString().split('T')[0], dateRange.to.toISOString().split('T')[0]),
-          checkTodayStatus()
-        ])
-        setMyAttendance(attendance)
-        setCheckinStatus(todayStatus)
-      } else if (user?.role === 'hr' || user?.role === 'admin') {
+          getMyAttendance(
+            dateRange.from.toISOString().split("T")[0],
+            dateRange.to.toISOString().split("T")[0]
+          ),
+          checkTodayStatus(),
+        ]);
+        setMyAttendance(attendance);
+        setCheckinStatus(todayStatus);
+      } else if (user?.role === "hr" || user?.role === "admin") {
         // For HR/Admin, show dashboard and employees list
         const [dashboardData, employeesList] = await Promise.all([
           getAttendanceDashboard(),
-          fetchEmployees()
-        ])
-        setDashboard(dashboardData)
-        setEmployees(employeesList)
+          fetchEmployees(),
+        ]);
+        setDashboard(dashboardData);
+        setEmployees(employeesList);
 
         // If an employee is selected, load their attendance
         if (selectedEmployee) {
           const empAttendance = await getEmployeeAttendance(
             selectedEmployee,
-            dateRange.from.toISOString().split('T')[0],
-            dateRange.to.toISOString().split('T')[0]
-          )
-          setEmployeeAttendance(empAttendance)
+            dateRange.from.toISOString().split("T")[0],
+            dateRange.to.toISOString().split("T")[0]
+          );
+          setEmployeeAttendance(empAttendance);
         }
       }
     } catch (error) {
-      console.error("Error loading attendance data:", error)
+      console.error("Error loading attendance data:", error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
   async function checkTodayStatus() {
     try {
-      const today = getCurrentESTDate()
-      const myAttendance = await getMyAttendance(today, today)
-      const todayRecord = myAttendance.find((a: any) => a.date === today)
-      
+      const today = getCurrentESTDate();
+      const myAttendance = await getMyAttendance(today, today);
+      const todayRecord = myAttendance.find((a: any) => a.date === today);
+
       if (todayRecord) {
         return {
           hasCheckedIn: true,
           checkinTime: todayRecord.checkinTime,
           checkinId: todayRecord.checkinId,
-          hasCheckedOut: !!todayRecord.checkoutTime
-        }
+          hasCheckedOut: !!todayRecord.checkoutTime,
+        };
       }
-      return { hasCheckedIn: false }
+      return { hasCheckedIn: false };
     } catch (error) {
-      return { hasCheckedIn: false }
+      return { hasCheckedIn: false };
     }
   }
 
   async function handleCheckIn() {
     try {
-      await checkIn()
+      await checkIn();
       setCheckinStatus({
         hasCheckedIn: true,
-        checkinTime: new Date().toISOString()
-      })
-      await loadData()
+        checkinTime: new Date().toISOString(),
+      });
+      await loadData();
     } catch (error) {
-      console.error("Error checking in:", error)
-      alert("Failed to check in")
+      console.error("Error checking in:", error);
+      alert("Failed to check in");
     }
   }
 
   async function handleCheckOut() {
     try {
-      await checkOut(checkinStatus.checkinId!)
-      setCheckinStatus({ hasCheckedIn: false })
-      await loadData()
+      await checkOut(checkinStatus.checkinId!);
+      setCheckinStatus({ hasCheckedIn: false });
+      await loadData();
     } catch (error) {
-      console.error("Error checking out:", error)
-      alert("Failed to check out")
+      console.error("Error checking out:", error);
+      alert("Failed to check out");
     }
   }
 
   // Statistics for current month
   const currentMonthStats = useMemo(() => {
-    const currentMonth = new Date().toISOString().slice(0, 7) // YYYY-MM
-    const monthAttendance = myAttendance.filter(a => a.date.startsWith(currentMonth))
-    
-    const presentDays = monthAttendance.filter(a => {
-      const status = getAttendanceStatus(a.checkinTime, a.checkoutTime)
-      return status.status === "present"
-    }).length
-    
-    const halfDays = monthAttendance.filter(a => {
-      const status = getAttendanceStatus(a.checkinTime, a.checkoutTime)
-      return status.status === "half-day"
-    }).length
-    
-    const workingDays = new Date().getDate() // Days elapsed in current month
-    const attendancePercentage = workingDays > 0 ? ((presentDays + (halfDays * 0.5)) / workingDays) * 100 : 0
-    
+    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+    const monthAttendance = myAttendance.filter((a) =>
+      a.date.startsWith(currentMonth)
+    );
+
+    const presentDays = monthAttendance.filter((a) => {
+      const status = getAttendanceStatus(a.checkinTime, a.checkoutTime);
+      return status.status === "present";
+    }).length;
+
+    const halfDays = monthAttendance.filter((a) => {
+      const status = getAttendanceStatus(a.checkinTime, a.checkoutTime);
+      return status.status === "half-day";
+    }).length;
+
+    const workingDays = new Date().getDate(); // Days elapsed in current month
+    const attendancePercentage =
+      workingDays > 0
+        ? ((presentDays + halfDays * 0.5) / workingDays) * 100
+        : 0;
+
     const totalWorkingHours = monthAttendance.reduce((total, a) => {
       if (a.checkinTime && a.checkoutTime) {
-        const checkinDate = new Date(a.checkinTime)
-        const checkoutDate = new Date(a.checkoutTime)
-        const diffMs = checkoutDate.getTime() - checkinDate.getTime()
-        return total + (diffMs / (1000 * 60 * 60))
+        const checkinDate = new Date(a.checkinTime);
+        const checkoutDate = new Date(a.checkoutTime);
+        const diffMs = checkoutDate.getTime() - checkinDate.getTime();
+        return total + diffMs / (1000 * 60 * 60);
       }
-      return total
-    }, 0)
-    
+      return total;
+    }, 0);
+
     return {
       presentDays,
       halfDays,
@@ -292,9 +419,12 @@ export default function Attendance() {
       workingDays,
       attendancePercentage: Math.round(attendancePercentage),
       totalWorkingHours: Math.round(totalWorkingHours),
-      averageDailyHours: monthAttendance.length > 0 ? (totalWorkingHours / monthAttendance.length).toFixed(1) : "0.0"
-    }
-  }, [myAttendance])
+      averageDailyHours:
+        monthAttendance.length > 0
+          ? (totalWorkingHours / monthAttendance.length).toFixed(1)
+          : "0.0",
+    };
+  }, [myAttendance]);
 
   if (loading) {
     return (
@@ -306,7 +436,7 @@ export default function Attendance() {
           </div>
         </CardContent>
       </Card>
-    )
+    );
   }
 
   return (
@@ -314,7 +444,9 @@ export default function Attendance() {
       {/* Header with current time */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Attendance Management</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+            Attendance Management
+          </h1>
           <p className="text-gray-600 mt-1">
             EST Timezone • Working Hours: 9:00 AM - 6:00 PM EST
           </p>
@@ -322,8 +454,11 @@ export default function Attendance() {
         <div className="text-right">
           <div className="text-2xl font-bold text-gray-900">{currentTime}</div>
           <div className="text-sm text-gray-600">{currentDate} (EST)</div>
-          {!isWorkingHours() && (
-            <Badge variant="outline" className="mt-1 bg-yellow-50 text-yellow-700 border-yellow-200">
+          {!isWorkingHoursEST() && (
+            <Badge
+              variant="outline"
+              className="mt-1 bg-yellow-50 text-yellow-700 border-yellow-200"
+            >
               ⚠️ Outside working hours
             </Badge>
           )}
@@ -334,7 +469,9 @@ export default function Attendance() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid grid-cols-2 w-full max-w-md">
           <TabsTrigger value="my-attendance">My Attendance</TabsTrigger>
-          <TabsTrigger value="dashboard">Dashboard {user?.role !== 'employee' && '(HR/Admin)'}</TabsTrigger>
+          <TabsTrigger value="dashboard">
+            Dashboard {user?.role !== "employee" && "(HR/Admin)"}
+          </TabsTrigger>
         </TabsList>
 
         {/* My Attendance Tab - For all users */}
@@ -344,28 +481,31 @@ export default function Attendance() {
             <CardContent className="p-6">
               <div className="flex flex-col md:flex-row items-center justify-between gap-4">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Daily Check-in</h3>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Daily Check-in
+                  </h3>
                   <p className="text-gray-600 text-sm mt-1">
                     Check in when you arrive and check out when you leave
                   </p>
                   {checkinStatus.hasCheckedIn && checkinStatus.checkinTime && (
                     <p className="text-sm text-green-600 mt-2">
-                      Checked in at: {formatESTTime(new Date(checkinStatus.checkinTime))}
+                      Checked in at:{" "}
+                      {formatESTTime(new Date(checkinStatus.checkinTime))}
                     </p>
                   )}
                 </div>
-                
+
                 <div className="flex gap-3">
                   {!checkinStatus.hasCheckedIn ? (
-                    <Button 
+                    <Button
                       onClick={handleCheckIn}
-                      disabled={!isWorkingHours()}
+                      disabled={!isWorkingHoursEST()}
                       className="bg-green-600 hover:bg-green-700 px-6"
                     >
                       📍 Check In
                     </Button>
                   ) : (
-                    <Button 
+                    <Button
                       onClick={handleCheckOut}
                       variant="outline"
                       className="border-red-300 text-red-700 hover:bg-red-50 px-6"
@@ -373,9 +513,12 @@ export default function Attendance() {
                       🏠 Check Out
                     </Button>
                   )}
-                  
-                  {!isWorkingHours() && !checkinStatus.hasCheckedIn && (
-                    <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+
+                  {!isWorkingHoursEST() && !checkinStatus.hasCheckedIn && (
+                    <Badge
+                      variant="outline"
+                      className="bg-yellow-50 text-yellow-700 border-yellow-200"
+                    >
                       Check-in available 9:00 AM - 6:00 PM EST
                     </Badge>
                   )}
@@ -390,27 +533,21 @@ export default function Attendance() {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-600">Present Days</p>
-                    <p className="text-2xl font-bold text-gray-900">{currentMonthStats.presentDays}</p>
+                    <p className="text-sm font-medium text-gray-600">
+                      Present Days
+                    </p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {currentMonthStats.presentDays}
+                    </p>
                   </div>
                   <div className="text-2xl">✅</div>
                 </div>
-                <Progress value={currentMonthStats.attendancePercentage} className="mt-2" />
-                <p className="text-xs text-gray-500 mt-1">{currentMonthStats.attendancePercentage}% attendance</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Half Days</p>
-                    <p className="text-2xl font-bold text-gray-900">{currentMonthStats.halfDays}</p>
-                  </div>
-                  <div className="text-2xl">⏰</div>
-                </div>
+                <Progress
+                  value={currentMonthStats.attendancePercentage}
+                  className="mt-2"
+                />
                 <p className="text-xs text-gray-500 mt-1">
-                  {currentMonthStats.workingDays - currentMonthStats.presentDays - currentMonthStats.halfDays} full absent days
+                  {currentMonthStats.attendancePercentage}% attendance
                 </p>
               </CardContent>
             </Card>
@@ -419,8 +556,34 @@ export default function Attendance() {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-600">Total Hours</p>
-                    <p className="text-2xl font-bold text-gray-900">{currentMonthStats.totalWorkingHours}h</p>
+                    <p className="text-sm font-medium text-gray-600">
+                      Half Days
+                    </p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {currentMonthStats.halfDays}
+                    </p>
+                  </div>
+                  <div className="text-2xl">⏰</div>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  {currentMonthStats.workingDays -
+                    currentMonthStats.presentDays -
+                    currentMonthStats.halfDays}{" "}
+                  full absent days
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">
+                      Total Hours
+                    </p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {currentMonthStats.totalWorkingHours}h
+                    </p>
                   </div>
                   <div className="text-2xl">⏱️</div>
                 </div>
@@ -434,13 +597,18 @@ export default function Attendance() {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-600">Working Days</p>
-                    <p className="text-2xl font-bold text-gray-900">{currentMonthStats.workingDays}</p>
+                    <p className="text-sm font-medium text-gray-600">
+                      Working Days
+                    </p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {currentMonthStats.workingDays}
+                    </p>
                   </div>
                   <div className="text-2xl">📅</div>
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
-                  {new Date().toLocaleDateString('en-US', { month: 'long' })} {new Date().getFullYear()}
+                  {new Date().toLocaleDateString("en-US", { month: "long" })}{" "}
+                  {new Date().getFullYear()}
                 </p>
               </CardContent>
             </Card>
@@ -463,32 +631,47 @@ export default function Attendance() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {myAttendance.length > 0 ? myAttendance.map((record) => {
-                    const status = getAttendanceStatus(record.checkinTime, record.checkoutTime)
-                    return (
-                      <TableRow key={record.checkinId}>
-                        <TableCell className="font-medium">
-                          {formatESTDate(new Date(record.date))}
-                        </TableCell>
-                        <TableCell>
-                          {record.checkinTime ? formatESTTime(new Date(record.checkinTime)) : "-"}
-                        </TableCell>
-                        <TableCell>
-                          {record.checkoutTime ? formatESTTime(new Date(record.checkoutTime)) : "-"}
-                        </TableCell>
-                        <TableCell>
-                          {calculateWorkingHours(record.checkinTime, record.checkoutTime)}
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={status.color}>
-                            {status.label}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  }) : (
+                  {myAttendance.length > 0 ? (
+                    myAttendance.map((record) => {
+                      const status = getAttendanceStatus(
+                        record.checkinTime,
+                        record.checkoutTime
+                      );
+                      return (
+                        <TableRow key={record.checkinId}>
+                          <TableCell className="font-medium">
+                            {formatESTDate(new Date(record.date))}
+                          </TableCell>
+                          <TableCell>
+                            {record.checkinTime
+                              ? formatESTTime(new Date(record.checkinTime))
+                              : "-"}
+                          </TableCell>
+                          <TableCell>
+                            {record.checkoutTime
+                              ? formatESTTime(new Date(record.checkoutTime))
+                              : "-"}
+                          </TableCell>
+                          <TableCell>
+                            {calculateWorkingHours(
+                              record.checkinTime,
+                              record.checkoutTime
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={status.color}>
+                              {status.label}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  ) : (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                      <TableCell
+                        colSpan={5}
+                        className="text-center py-8 text-gray-500"
+                      >
                         No attendance records found
                       </TableCell>
                     </TableRow>
@@ -500,7 +683,7 @@ export default function Attendance() {
         </TabsContent>
 
         {/* Dashboard Tab - HR/Admin only */}
-        {(user?.role === 'hr' || user?.role === 'admin') && (
+        {(user?.role === "hr" || user?.role === "admin") && (
           <TabsContent value="dashboard" className="space-y-6">
             {/* Real-time Dashboard */}
             <Card>
@@ -517,8 +700,12 @@ export default function Attendance() {
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-sm font-medium text-green-600">Checked In</p>
-                            <p className="text-2xl font-bold text-green-900">{dashboard.checkedIn}</p>
+                            <p className="text-sm font-medium text-green-600">
+                              Checked In
+                            </p>
+                            <p className="text-2xl font-bold text-green-900">
+                              {dashboard.checkedIn}
+                            </p>
                           </div>
                           <div className="text-2xl">✅</div>
                         </div>
@@ -532,8 +719,12 @@ export default function Attendance() {
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-sm font-medium text-blue-600">Checked Out</p>
-                            <p className="text-2xl font-bold text-blue-900">{dashboard.checkedOut}</p>
+                            <p className="text-sm font-medium text-blue-600">
+                              Checked Out
+                            </p>
+                            <p className="text-2xl font-bold text-blue-900">
+                              {dashboard.checkedOut}
+                            </p>
                           </div>
                           <div className="text-2xl">🏠</div>
                         </div>
@@ -547,8 +738,12 @@ export default function Attendance() {
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-sm font-medium text-yellow-600">Not Checked In</p>
-                            <p className="text-2xl font-bold text-yellow-900">{dashboard.notCheckedIn}</p>
+                            <p className="text-sm font-medium text-yellow-600">
+                              Not Checked In
+                            </p>
+                            <p className="text-2xl font-bold text-yellow-900">
+                              {dashboard.notCheckedIn}
+                            </p>
                           </div>
                           <div className="text-2xl">⏰</div>
                         </div>
@@ -562,8 +757,12 @@ export default function Attendance() {
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-sm font-medium text-gray-600">Total Employees</p>
-                            <p className="text-2xl font-bold text-gray-900">{dashboard.totalEmployees}</p>
+                            <p className="text-sm font-medium text-gray-600">
+                              Total Employees
+                            </p>
+                            <p className="text-2xl font-bold text-gray-900">
+                              {dashboard.totalEmployees}
+                            </p>
                           </div>
                           <div className="text-2xl">👥</div>
                         </div>
@@ -574,7 +773,9 @@ export default function Attendance() {
                     </Card>
                   </div>
                 ) : (
-                  <p className="text-gray-500 text-center py-8">Loading dashboard...</p>
+                  <p className="text-gray-500 text-center py-8">
+                    Loading dashboard...
+                  </p>
                 )}
               </CardContent>
             </Card>
@@ -586,7 +787,10 @@ export default function Attendance() {
               </CardHeader>
               <CardContent>
                 <div className="flex flex-col md:flex-row gap-4 mb-6">
-                  <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
+                  <Select
+                    value={selectedEmployee}
+                    onValueChange={setSelectedEmployee}
+                  >
                     <SelectTrigger className="w-full md:w-64">
                       <SelectValue placeholder="Select Employee" />
                     </SelectTrigger>
@@ -602,15 +806,20 @@ export default function Attendance() {
                   <div className="flex items-center space-x-4">
                     <div className="text-sm text-gray-600">
                       <span className="font-medium">Date Range:</span>{" "}
-                      {dateRange.from.toLocaleDateString()} - {dateRange.to.toLocaleDateString()}
+                      {dateRange.from.toLocaleDateString()} -{" "}
+                      {dateRange.to.toLocaleDateString()}
                     </div>
                     <Button
                       variant="outline"
                       onClick={() => {
                         setDateRange({
-                          from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-                          to: new Date()
-                        })
+                          from: new Date(
+                            new Date().getFullYear(),
+                            new Date().getMonth(),
+                            1
+                          ),
+                          to: new Date(),
+                        });
                       }}
                     >
                       This Month
@@ -632,21 +841,36 @@ export default function Attendance() {
                     </TableHeader>
                     <TableBody>
                       {employeeAttendance.map((record) => {
-                        const status = getAttendanceStatus(record.checkinTime, record.checkoutTime)
-                        const employee = employees.find(e => e.employeeId === record.employeeId)
+                        const status = getAttendanceStatus(
+                          record.checkinTime,
+                          record.checkoutTime
+                        );
+                        const employee = employees.find(
+                          (e) => e.employeeId === record.employeeId
+                        );
                         return (
                           <TableRow key={record.checkinId}>
-                            <TableCell>{formatESTDate(new Date(record.date))}</TableCell>
                             <TableCell>
-                              <div className="font-medium">{employee?.firstName} {employee?.lastName}</div>
-                              <div className="text-sm text-gray-500">{record.employeeId}</div>
+                              {formatESTDate(new Date(record.date))}
+                            </TableCell>
+                            <TableCell>
+                              <div className="font-medium">
+                                {employee?.firstName} {employee?.lastName}
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                {record.employeeId}
+                              </div>
                             </TableCell>
                             <TableCell>{record.department}</TableCell>
                             <TableCell>
-                              {record.checkinTime ? formatESTTime(new Date(record.checkinTime)) : "-"}
+                              {record.checkinTime
+                                ? formatESTTime(new Date(record.checkinTime))
+                                : "-"}
                             </TableCell>
                             <TableCell>
-                              {record.checkoutTime ? formatESTTime(new Date(record.checkoutTime)) : "-"}
+                              {record.checkoutTime
+                                ? formatESTTime(new Date(record.checkoutTime))
+                                : "-"}
                             </TableCell>
                             <TableCell>
                               <Badge className={status.color}>
@@ -654,14 +878,18 @@ export default function Attendance() {
                               </Badge>
                             </TableCell>
                           </TableRow>
-                        )
+                        );
                       })}
                     </TableBody>
                   </Table>
                 ) : selectedEmployee ? (
-                  <p className="text-gray-500 text-center py-8">No attendance records found for this employee</p>
+                  <p className="text-gray-500 text-center py-8">
+                    No attendance records found for this employee
+                  </p>
                 ) : (
-                  <p className="text-gray-500 text-center py-8">Select an employee to view their attendance</p>
+                  <p className="text-gray-500 text-center py-8">
+                    Select an employee to view their attendance
+                  </p>
                 )}
               </CardContent>
             </Card>
@@ -669,10 +897,13 @@ export default function Attendance() {
             {/* Today's Attendance List */}
             <Card>
               <CardHeader>
-                <CardTitle>Today's Attendance ({getCurrentESTDate()})</CardTitle>
+                <CardTitle>
+                  Today's Attendance ({getCurrentESTDate()})
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                {dashboard?.attendanceRecords && dashboard.attendanceRecords.length > 0 ? (
+                {dashboard?.attendanceRecords &&
+                dashboard.attendanceRecords.length > 0 ? (
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -685,19 +916,30 @@ export default function Attendance() {
                     </TableHeader>
                     <TableBody>
                       {dashboard.attendanceRecords.map((record: any) => {
-                        const status = getAttendanceStatus(record.checkinTime, record.checkoutTime)
+                        const status = getAttendanceStatus(
+                          record.checkinTime,
+                          record.checkoutTime
+                        );
                         return (
                           <TableRow key={record.checkinId}>
                             <TableCell>
-                              <div className="font-medium">{record.employeeName}</div>
-                              <div className="text-sm text-gray-500">{record.employeeId}</div>
+                              <div className="font-medium">
+                                {record.employeeName}
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                {record.employeeId}
+                              </div>
                             </TableCell>
                             <TableCell>{record.department}</TableCell>
                             <TableCell>
-                              {record.checkinTime ? formatESTTime(new Date(record.checkinTime)) : "-"}
+                              {record.checkinTime
+                                ? formatESTTime(new Date(record.checkinTime))
+                                : "-"}
                             </TableCell>
                             <TableCell>
-                              {record.checkoutTime ? formatESTTime(new Date(record.checkoutTime)) : "-"}
+                              {record.checkoutTime
+                                ? formatESTTime(new Date(record.checkoutTime))
+                                : "-"}
                             </TableCell>
                             <TableCell>
                               <Badge className={status.color}>
@@ -705,12 +947,14 @@ export default function Attendance() {
                               </Badge>
                             </TableCell>
                           </TableRow>
-                        )
+                        );
                       })}
                     </TableBody>
                   </Table>
                 ) : (
-                  <p className="text-gray-500 text-center py-8">No attendance records for today yet</p>
+                  <p className="text-gray-500 text-center py-8">
+                    No attendance records for today yet
+                  </p>
                 )}
               </CardContent>
             </Card>
@@ -718,5 +962,5 @@ export default function Attendance() {
         )}
       </Tabs>
     </div>
-  )
+  );
 }

@@ -16,6 +16,9 @@ const getAuthHeaders = () => {
   return headers;
 };
 
+// Import fetchEmployees to use in functions that need employee data
+import { fetchEmployees } from './employees';
+
 export interface AttendanceRecord {
   checkinId: string;
   employeeId: string;
@@ -26,6 +29,19 @@ export interface AttendanceRecord {
   checkoutTime: string | null;
   totalHours: number | null;
   createdAt: string;
+}
+
+// For Dashboard compatibility - old format with yearMonth
+export interface MonthlyAttendanceRecord {
+  employeeId: string;
+  employeeName?: string;
+  yearMonth: string; // YYYY-MM
+  absentDays?: number;
+  lopDays?: number;
+  paidLeaveUsed?: number;
+  casualLeavesConsumed?: number;
+  sickLeavesConsumed?: number;
+  leaveMode?: string;
 }
 
 export interface DashboardData {
@@ -244,6 +260,7 @@ export async function getTodaysAttendanceSummary(): Promise<{
   notCheckedIn: string[]; // employee IDs
 }> {
   const dashboard = await getAttendanceDashboard();
+  const allEmployees = await fetchEmployees();
   
   const checkedIn = dashboard.attendanceRecords.filter(
     (record) => record.checkinTime && !record.checkoutTime
@@ -253,10 +270,6 @@ export async function getTodaysAttendanceSummary(): Promise<{
     (record) => record.checkoutTime
   );
 
-  // Note: You might need to fetch all employees to get notCheckedIn list
-  // This is a simplified version
-  const allEmployees: any[] = []; // You might want to fetch this from employees API
-  
   const checkedInEmployeeIds = new Set(
     dashboard.attendanceRecords.map((record) => record.employeeId)
   );
@@ -270,4 +283,117 @@ export async function getTodaysAttendanceSummary(): Promise<{
     checkedOut,
     notCheckedIn,
   };
+}
+
+// ==================== DASHBOARD-COMPATIBLE FUNCTIONS ====================
+
+// This function matches what your Dashboard expects
+export async function fetchAttendance(): Promise<MonthlyAttendanceRecord[]> {
+  try {
+    // Since we don't have the old endpoint, we'll convert the new data
+    const myAttendance = await getMyAttendance();
+    
+    // Convert daily records to monthly format
+    const monthlyMap = new Map<string, MonthlyAttendanceRecord>();
+    
+    myAttendance.forEach(record => {
+      const yearMonth = record.date.substring(0, 7); // Extract YYYY-MM
+      const key = `${record.employeeId}_${yearMonth}`;
+      
+      if (!monthlyMap.has(key)) {
+        monthlyMap.set(key, {
+          employeeId: record.employeeId,
+          employeeName: record.employeeName,
+          yearMonth,
+          absentDays: 0,
+          lopDays: 0,
+          paidLeaveUsed: 0,
+          casualLeavesConsumed: 0,
+          sickLeavesConsumed: 0,
+          leaveMode: 'auto'
+        });
+      }
+      
+      const monthlyRecord = monthlyMap.get(key)!;
+      
+      // If no check-in for the day, count as absent
+      if (!record.checkinTime) {
+        monthlyRecord.absentDays = (monthlyRecord.absentDays || 0) + 1;
+        monthlyRecord.lopDays = (monthlyRecord.lopDays || 0) + 1;
+      }
+    });
+    
+    return Array.from(monthlyMap.values());
+  } catch (error) {
+    console.error('Error in fetchAttendance:', error);
+    return [];
+  }
+}
+
+// Get all employees' monthly attendance summary (for HR/Admin)
+export async function getAllEmployeesAttendance(
+  yearMonth?: string
+): Promise<MonthlyAttendanceRecord[]> {
+  try {
+    // If no month specified, use current month
+    const currentDate = new Date();
+    const targetMonth = yearMonth || 
+      `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+    
+    // Get all employees
+    const allEmployees = await fetchEmployees();
+    const result: MonthlyAttendanceRecord[] = [];
+    
+    // For each employee, get their attendance for the month
+    // Note: This might be inefficient with many employees
+    // In production, you should have a dedicated endpoint for this
+    
+    for (const emp of allEmployees) {
+      try {
+        const startDate = `${targetMonth}-01`;
+        const endDate = `${targetMonth}-${new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate()}`;
+        
+        const employeeAttendance = await getEmployeeAttendance(
+          emp.employeeId,
+          startDate,
+          endDate
+        );
+        
+        // Calculate stats
+        const totalDays = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
+        const absentDays = totalDays - employeeAttendance.length;
+        
+        result.push({
+          employeeId: emp.employeeId,
+          employeeName: `${emp.firstName} ${emp.lastName}`,
+          yearMonth: targetMonth,
+          absentDays: Math.max(0, absentDays),
+          lopDays: Math.max(0, absentDays), // Assuming all absents are LOP
+          paidLeaveUsed: 0,
+          casualLeavesConsumed: 0,
+          sickLeavesConsumed: 0,
+          leaveMode: 'auto'
+        });
+      } catch (error) {
+        console.error(`Error getting attendance for ${emp.employeeId}:`, error);
+        // Add employee with default values
+        result.push({
+          employeeId: emp.employeeId,
+          employeeName: `${emp.firstName} ${emp.lastName}`,
+          yearMonth: targetMonth,
+          absentDays: 0,
+          lopDays: 0,
+          paidLeaveUsed: 0,
+          casualLeavesConsumed: 0,
+          sickLeavesConsumed: 0,
+          leaveMode: 'auto'
+        });
+      }
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('Error in getAllEmployeesAttendance:', error);
+    return [];
+  }
 }

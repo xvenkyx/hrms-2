@@ -48,24 +48,33 @@ interface LeaveRequest {
 }
 
 const LeaveRequests: React.FC = () => {
-  const [requests, setRequests] = useState<LeaveRequest[]>([]);
+  const [pendingRequests, setPendingRequests] = useState<LeaveRequest[]>([]);
+  const [allRequests, setAllRequests] = useState<LeaveRequest[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
-  const [filterStatus, setFilterStatus] = useState('pending');
+
+  // Filters
   const [searchTerm, setSearchTerm] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState('all');
+  const [monthFilter, setMonthFilter] = useState('');
+  const [leaveTypeFilter, setLeaveTypeFilter] = useState('all');
+
   const [processing, setProcessing] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    fetchLeaveRequests();
-  }, [filterStatus]);
+    fetchAllRequests();
+  }, []);
 
-  const fetchLeaveRequests = async () => {
+  const fetchAllRequests = async () => {
     try {
       setLoading(true);
       setError('');
-      const requests = await getAllLeaveRequests(filterStatus === 'all' ? undefined : filterStatus);
-      setRequests(requests);
+
+      const all = await getAllLeaveRequests("all");
+      setAllRequests(all);
+      setPendingRequests(all.filter(r => r.status === "pending"));
     } catch (err: any) {
       console.error('Error fetching leave requests:', err);
       setError(err.message || 'Failed to load leave requests');
@@ -84,11 +93,11 @@ const LeaveRequests: React.FC = () => {
     try {
       const comments = prompt(`Enter comments for ${action} (optional):`);
       await processLeaveRequest(requestId, action, comments || '');
-      
+
       setSuccess(`Leave request ${action}d successfully!`);
       setTimeout(() => setSuccess(''), 3000);
-      
-      fetchLeaveRequests(); // Refresh the list
+
+      fetchAllRequests();
     } catch (err: any) {
       console.error(`Error ${action}ing leave request:`, err);
       setError(err.message || `Failed to ${action} leave request`);
@@ -98,35 +107,38 @@ const LeaveRequests: React.FC = () => {
     }
   };
 
-  const filteredRequests = requests.filter(request => {
-    if (!searchTerm) return true;
-    
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      request.employeeName?.toLowerCase().includes(searchLower) ||
-      request.employeeId?.toLowerCase().includes(searchLower) ||
-      request.department?.toLowerCase().includes(searchLower) ||
-      request.requestId?.toLowerCase().includes(searchLower)
-    );
+  // Filter logic for all requests
+  const filteredAllRequests = allRequests.filter(request => {
+    const matchesSearch =
+      request.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      request.employeeId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      request.department.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesDept =
+      departmentFilter === 'all' || request.department === departmentFilter;
+
+    const matchesMonth =
+      monthFilter === '' || request.yearMonth === monthFilter;
+
+    const matchesType =
+      leaveTypeFilter === 'all' || request.leaveType === leaveTypeFilter;
+
+    return matchesSearch && matchesDept && matchesMonth && matchesType;
   });
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'approved':
-        return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Approved</Badge>;
+        return <Badge className="bg-green-100 text-green-800">Approved</Badge>;
       case 'rejected':
-        return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">Rejected</Badge>;
+        return <Badge className="bg-red-100 text-red-800">Rejected</Badge>;
       default:
-        return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Pending</Badge>;
+        return <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>;
     }
   };
 
   const getTypeBadge = (type: string) => {
-    return (
-      <Badge variant="outline" className="capitalize">
-        {type} Leave
-      </Badge>
-    );
+    return <Badge variant="outline" className="capitalize">{type} Leave</Badge>;
   };
 
   if (loading) {
@@ -142,37 +154,23 @@ const LeaveRequests: React.FC = () => {
     );
   }
 
-  const pendingCount = requests.filter(r => r.status === 'pending').length;
-
   return (
     <div className="space-y-6">
+
+      {/** HEADER **/}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Leave Requests</h1>
-          <p className="text-gray-600 mt-1">
-            Review and manage employee leave requests
-          </p>
+          <h1 className="text-2xl md:text-3xl font-bold">Leave Requests</h1>
+          <p className="text-gray-600 mt-1">Review and manage employee leave requests</p>
         </div>
-        <Badge variant="secondary" className="text-sm">
-          {pendingCount} pending
-        </Badge>
+        <Badge variant="secondary">{pendingRequests.length} pending</Badge>
       </div>
 
       {error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Error</AlertTitle>
-          <AlertDescription className="flex items-center justify-between">
-            <span>{error}</span>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={fetchLeaveRequests}
-              className="ml-2 h-auto p-0"
-            >
-              Retry
-            </Button>
-          </AlertDescription>
+          <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
@@ -184,180 +182,208 @@ const LeaveRequests: React.FC = () => {
         </Alert>
       )}
 
-      {/* Filters */}
+      {/** FILTERS FOR ALL REQUESTS **/}
       <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <Input
-                placeholder="Search by employee name, ID, department..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full"
-              />
-            </div>
-            <div className="w-full md:w-64">
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="approved">Approved</SelectItem>
-                  <SelectItem value="rejected">Rejected</SelectItem>
-                  <SelectItem value="all">All</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setSearchTerm('');
-                setFilterStatus('pending');
-              }}
-            >
-              Clear Filters
-            </Button>
-            <Button
-              variant="default"
-              onClick={fetchLeaveRequests}
-              disabled={loading}
-            >
-              {loading ? 'Refreshing...' : 'Refresh'}
-            </Button>
+        <CardHeader>
+          <CardTitle>Filters for All Requests</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+
+            <Input
+              placeholder="Search name, employee ID, department..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+
+            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+              <SelectTrigger><SelectValue placeholder="Department" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Departments</SelectItem>
+                <SelectItem value="HR">HR</SelectItem>
+                <SelectItem value="Sales">Sales</SelectItem>
+                <SelectItem value="ICT">ICT</SelectItem>
+                <SelectItem value="Finance">Finance</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Input
+              type="month"
+              value={monthFilter}
+              onChange={(e) => setMonthFilter(e.target.value)}
+              placeholder="Filter by month"
+            />
+
+            <Select value={leaveTypeFilter} onValueChange={setLeaveTypeFilter}>
+              <SelectTrigger><SelectValue placeholder="Leave type" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="casual">Casual Leave</SelectItem>
+                <SelectItem value="sick">Sick Leave</SelectItem>
+                <SelectItem value="earned">Earned Leave</SelectItem>
+              </SelectContent>
+            </Select>
+
           </div>
+
+          <Button variant="outline" onClick={() => {
+            setSearchTerm('');
+            setDepartmentFilter('all');
+            setMonthFilter('');
+            setLeaveTypeFilter('all');
+          }}>
+            Clear Filters
+          </Button>
         </CardContent>
       </Card>
 
-      {/* Leave Requests Table */}
+      {/** PENDING REQUESTS TABLE **/}
       <Card>
         <CardHeader>
-          <CardTitle>
-            {filterStatus === 'all' ? 'All Leave Requests' : 
-             filterStatus === 'pending' ? 'Pending Leave Requests' :
-             `${filterStatus.charAt(0).toUpperCase() + filterStatus.slice(1)} Leave Requests`}
-            <span className="ml-2 text-sm font-normal text-gray-500">
-              ({filteredRequests.length} requests)
-            </span>
-          </CardTitle>
+          <CardTitle>Pending Leave Requests ({pendingRequests.length})</CardTitle>
         </CardHeader>
         <CardContent>
-          {filteredRequests.length > 0 ? (
-            <div className="overflow-x-auto rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-16">ID</TableHead>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Month</TableHead>
-                    <TableHead>Days</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Reason</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Submitted</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredRequests.map((request) => (
-                    <TableRow key={request.requestId}>
-                      <TableCell className="font-mono text-xs">
-                        {request.requestId.substring(0, 8)}...
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{request.employeeName}</div>
-                          <div className="text-sm text-gray-500">
-                            {request.employeeId} • {request.department}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {request.yearMonth}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={request.days > 3 ? "destructive" : "outline"}>
-                          {request.days} {request.days === 1 ? 'day' : 'days'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {getTypeBadge(request.leaveType)}
-                      </TableCell>
-                      <TableCell className="max-w-xs">
-                        <div className="truncate" title={request.reason}>
-                          {request.reason || "No reason provided"}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {getStatusBadge(request.status)}
-                      </TableCell>
-                      <TableCell>
-                        {new Date(request.createdAt).toLocaleDateString('en-US', {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric'
-                        })}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {request.status === 'pending' ? (
-                          <div className="flex justify-end space-x-2">
-                            <Button
-                              size="sm"
-                              variant="default"
-                              onClick={() => handleApproveReject(request.requestId, 'approve')}
-                              disabled={processing[request.requestId]}
-                              className="bg-green-600 hover:bg-green-700"
-                            >
-                              {processing[request.requestId] ? 'Processing...' : 'Approve'}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => handleApproveReject(request.requestId, 'reject')}
-                              disabled={processing[request.requestId]}
-                            >
-                              {processing[request.requestId] ? 'Processing...' : 'Reject'}
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="text-right space-y-1">
-                            {request.approvedBy && (
-                              <div className="text-sm text-gray-500">
-                                By: {request.approvedBy}
-                              </div>
-                            )}
-                            {request.comments && (
-                              <div className="text-xs text-gray-400" title={request.comments}>
-                                {request.comments.length > 30 
-                                  ? `${request.comments.substring(0, 30)}...`
-                                  : request.comments}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+          {pendingRequests.length === 0 ? (
+            <p className="text-gray-500">No pending requests</p>
           ) : (
-            <div className="text-center py-12">
-              <div className="text-6xl mb-4">📭</div>
-              <h3 className="text-xl font-semibold text-gray-700 mb-2">
-                No leave requests found
-              </h3>
-              <p className="text-gray-500">
-                {searchTerm || filterStatus !== 'pending' 
-                  ? 'Try adjusting your filters or search term'
-                  : 'No pending leave requests at the moment'}
-              </p>
-            </div>
+            <PendingTable
+              requests={pendingRequests}
+              processing={processing}
+              onAction={handleApproveReject}
+              getTypeBadge={getTypeBadge}
+              getStatusBadge={getStatusBadge}
+            />
           )}
         </CardContent>
       </Card>
+
+      {/** ALL PAST REQUESTS TABLE **/}
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            All Leave Requests ({filteredAllRequests.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <PastRequestsTable
+            requests={filteredAllRequests}
+            getTypeBadge={getTypeBadge}
+            getStatusBadge={getStatusBadge}
+          />
+        </CardContent>
+      </Card>
+
     </div>
   );
 };
 
 export default LeaveRequests;
+
+/**************************************
+ * Reusable Table Components
+ **************************************/
+
+const PendingTable = ({
+  requests,
+  processing,
+  onAction,
+  getTypeBadge,
+  getStatusBadge,
+}: any) => (
+  <div className="overflow-x-auto rounded-md border">
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>ID</TableHead>
+          <TableHead>Employee</TableHead>
+          <TableHead>Month</TableHead>
+          <TableHead>Days</TableHead>
+          <TableHead>Type</TableHead>
+          <TableHead>Reason</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead>Submitted</TableHead>
+          <TableHead className="text-right">Actions</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {requests.map((request: LeaveRequest) => (
+          <TableRow key={request.requestId}>
+            <TableCell>{request.requestId.slice(0, 8)}...</TableCell>
+            <TableCell>
+              <div className="font-medium">{request.employeeName}</div>
+              <div className="text-sm text-gray-500">
+                {request.employeeId} • {request.department}
+              </div>
+            </TableCell>
+            <TableCell>{request.yearMonth}</TableCell>
+            <TableCell>{request.days}</TableCell>
+            <TableCell>{getTypeBadge(request.leaveType)}</TableCell>
+            <TableCell>{request.reason}</TableCell>
+            <TableCell>{getStatusBadge(request.status)}</TableCell>
+            <TableCell>
+              {new Date(request.createdAt).toLocaleDateString()}
+            </TableCell>
+            <TableCell className="text-right space-x-2">
+              <Button
+                size="sm"
+                className="bg-green-600 text-white"
+                disabled={processing[request.requestId]}
+                onClick={() => onAction(request.requestId, 'approve')}
+              >
+                Approve
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                disabled={processing[request.requestId]}
+                onClick={() => onAction(request.requestId, 'reject')}
+              >
+                Reject
+              </Button>
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  </div>
+);
+
+const PastRequestsTable = ({
+  requests,
+  getTypeBadge,
+  getStatusBadge,
+}: any) => (
+  <div className="overflow-x-auto rounded-md border">
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>ID</TableHead>
+          <TableHead>Employee</TableHead>
+          <TableHead>Department</TableHead>
+          <TableHead>Month</TableHead>
+          <TableHead>Days</TableHead>
+          <TableHead>Type</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead>Reason</TableHead>
+          <TableHead>Submitted</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {requests.map((request: LeaveRequest) => (
+          <TableRow key={request.requestId}>
+            <TableCell>{request.requestId.slice(0, 8)}...</TableCell>
+            <TableCell>{request.employeeName}</TableCell>
+            <TableCell>{request.department}</TableCell>
+            <TableCell>{request.yearMonth}</TableCell>
+            <TableCell>{request.days}</TableCell>
+            <TableCell>{getTypeBadge(request.leaveType)}</TableCell>
+            <TableCell>{getStatusBadge(request.status)}</TableCell>
+            <TableCell className="truncate max-w-xs">{request.reason}</TableCell>
+            <TableCell>{new Date(request.createdAt).toLocaleDateString()}</TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  </div>
+);
