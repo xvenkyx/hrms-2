@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Silent Renew</title>
+</head>
+<body>
+    <script>
+        console.log('Silent renew callback received');
+        window.opener.postMessage({ type: 'oidc-silent-renew' }, window.location.origin);
+    </script>
+</body>
+</html>

@@ -1,97 +1,69 @@
-import React, { useState } from 'react';
+// pages/Login.tsx
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 
 export default function Login() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
+  const { user, isAuthenticated, isLoading, login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setIsLoading(true);
+  useEffect(() => {
+    if (isAuthenticated && user && !isLoading) {
+      navigate('/', { replace: true });
+    }
+  }, [isAuthenticated, user, isLoading, navigate]);
 
+  const handleCognitoLogin = async () => {
     try {
-      await login(email, password);
-      navigate('/');
-    } catch (err: any) {
-      setError(err.message || 'Login failed. Please check your credentials.');
-    } finally {
-      setIsLoading(false);
+      await login();
+    } catch (error) {
+      console.error('Login error:', error);
+      alert('Login failed. Please try again.');
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="w-16 h-16 bg-linear-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center mx-auto mb-4">
-            <span className="text-white font-bold text-2xl">J</span>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-2xl shadow-lg">
+        <div className="text-center">
+          <div className="flex justify-center">
+            <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center">
+              <span className="text-white font-bold text-lg">J</span>
+            </div>
           </div>
-          <CardTitle className="text-2xl">Welcome to JHEX</CardTitle>
-          <p className="text-gray-600 mt-2">Sign in to your account</p>
-        </CardHeader>
-        
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Company Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@jhex.info"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-              <p className="text-xs text-gray-500">Only @jhex.info emails are allowed</p>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Enter your password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
+          <h2 className="mt-6 text-3xl font-bold text-gray-900">
+            Welcome to JHEX
+          </h2>
+          <p className="mt-2 text-sm text-gray-600">
+            Sign in with your company credentials
+          </p>
+        </div>
 
-            {error && (
-              <div className="bg-red-50 text-red-600 p-3 rounded-md text-sm">
-                {error}
-              </div>
-            )}
-
-            <Button
-              type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-700"
-              disabled={isLoading}
-            >
-              {isLoading ? 'Signing in...' : 'Sign in'}
-            </Button>
-
-            <div className="text-center text-sm text-gray-600">
-              <p>Demo Credentials:</p>
-              <p className="text-xs mt-1">
-                Admin: admin@jhex.info / admin123<br />
-                HR: hr@jhex.info / hr123<br />
-                Employee: john.doe@jhex.info / emp123
-              </p>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+        <div className="mt-8 space-y-4">
+          <button
+            onClick={handleCognitoLogin}
+            className="w-full flex items-center justify-center gap-3 bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          >
+            <span>🔐</span>
+            Sign in with Cognito
+          </button>
+          
+          <div className="text-center text-sm text-gray-500 mt-6">
+            <p>Using AWS Cognito for secure authentication</p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

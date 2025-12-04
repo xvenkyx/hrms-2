@@ -1,3 +1,4 @@
+// MainLayout.tsx
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
@@ -19,9 +20,12 @@ export default function MainLayout() {
 
   // Redirect to login if not authenticated
   useEffect(() => {
-    if (!isLoading && !isAuthenticated && location.pathname !== '/login') {
-      console.log("Redirecting to login, auth state:", { isAuthenticated, isLoading });
-      navigate('/login', { replace: true });
+    if (!isLoading && !isAuthenticated && location.pathname !== "/login") {
+      console.log("Redirecting to login, auth state:", {
+        isAuthenticated,
+        isLoading,
+      });
+      navigate("/login", { replace: true });
     }
   }, [isAuthenticated, isLoading, location.pathname, navigate]);
 
@@ -30,31 +34,19 @@ export default function MainLayout() {
     { name: "Attendance", path: "/attendance", icon: "📅" },
   ];
 
-  // const employeeMenu = [
-  //   { name: "My Profile", path: "/my-profile", icon: "👤" },
-  //   { name: "Leave Requests", path: "/leave-requests", icon: "📋" },
-  // ];
-
-  // const adminMenu = [
-  //   { name: "Employees", path: "/employees", icon: "👥" },
-  //   { name: "Settings", path: "/settings", icon: "⚙️" },
-  //   { name: "Generate Slip", path: "/generate-slip", icon: "💰" },
-  //   { name: "Salary History", path: "/salary-history", icon: "📈" },
-  // ];
-
   const getMenu = () => {
     if (!isAuthenticated || !user) return [];
 
     let menu = [...baseMenu];
 
-    if (user.role === 'employee') {
+    if (user.role === "employee") {
       // Employee menu
       menu = [
         ...menu,
         { name: "My Profile", path: "/my-profile", icon: "👤" },
         { name: "My Leave Requests", path: "/my-leave-requests", icon: "📋" },
       ];
-    } else if (user.role === 'hr' || user.role === 'admin') {
+    } else if (user.role === "hr" || user.role === "admin") {
       // HR/Admin menu
       menu = [
         ...menu,
@@ -72,6 +64,15 @@ export default function MainLayout() {
 
   const menu = getMenu();
 
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+      window.location.href = '/login';
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -88,7 +89,7 @@ export default function MainLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-blue-50 to-indigo-100">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="px-4 sm:px-6 lg:px-8">
@@ -96,7 +97,7 @@ export default function MainLayout() {
             {/* Logo and Company Name */}
             <div className="flex items-center">
               <div className="shrink-0 flex items-center">
-                <div className="w-8 h-8 bg-linear-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center mr-3">
+                <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center mr-3">
                   <span className="text-white font-bold text-sm">J</span>
                 </div>
                 <h1 className="text-xl font-bold text-gray-900">JHEX</h1>
@@ -106,13 +107,13 @@ export default function MainLayout() {
             {/* Desktop: User Info + Time */}
             <div className="hidden md:flex items-center space-x-4">
               <div className="text-sm text-gray-700">
-                👋 {user.firstName || 'User'} {user.lastName || ''}
+                👋 {user.firstName || "User"} {user.lastName || ""}
                 <span className="ml-2 px-2 py-1 bg-gray-100 rounded-full text-xs">
-                  {user.department || 'Unknown'} • {user.role || 'employee'}
+                  {user.department || "Unknown"} • {user.role || "employee"}
                 </span>
               </div>
               <button
-                onClick={logout}
+                onClick={handleLogout}
                 className="text-sm bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-md transition-colors"
               >
                 Sign out
@@ -175,7 +176,7 @@ export default function MainLayout() {
             <div className="md:hidden fixed inset-y-0 left-0 w-64 bg-white shadow-lg z-50 transform transition-transform duration-300 ease-in-out">
               <div className="flex items-center justify-between p-4 border-b">
                 <div className="flex items-center">
-                  <div className="w-8 h-8 bg-linear-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center mr-3">
+                  <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center mr-3">
                     <span className="text-white font-bold text-sm">J</span>
                   </div>
                   <h1 className="text-lg font-bold text-gray-900">JHEX</h1>
@@ -212,14 +213,14 @@ export default function MainLayout() {
                 <div className="text-center text-sm text-gray-600 space-y-2">
                   <div className="pb-2">
                     <div className="font-medium">
-                      {user.firstName || 'User'} {user.lastName || ''}
+                      {user.firstName || "User"} {user.lastName || ""}
                     </div>
                     <div className="text-xs text-gray-500">
-                      {user.department || 'Unknown'} • {user.role || 'employee'}
+                      {user.department || "Unknown"} • {user.role || "employee"}
                     </div>
                   </div>
                   <button
-                    onClick={logout}
+                    onClick={handleLogout}
                     className="w-full text-sm bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-md transition-colors"
                   >
                     Sign out

@@ -1,33 +1,33 @@
+// context/AuthContext.tsx - FIXED
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { useAuth as useOIDCAuth } from 'react-oidc-context';
+import { getMyProfile } from '@/api/employees';
 
-// In AuthContext file, update the User interface:
 export interface User {
-  employeeId: string;  // Change from optional to required
+  employeeId: string;
   email: string;
   firstName?: string;
   lastName?: string;
   role?: 'admin' | 'hr' | 'employee';
   department?: string;
-  designation?: string;  // Add this
-  baseSalary?: number;  // Add this
-  leavesRemaining?: number;  // Add this
-  casualLeavesUsed?: number;  // Add this
-  casualLeavesTotal?: number;  // Add this
-  sickLeavesUsed?: number;  // Add this
-  sickLeavesTotal?: number;  // Add this
-  date_of_birth?: string;  // Add this
-  joiningDate?: string;  // Add this
-  pfApplicable?: boolean;  // Add this
+  designation?: string;
+  baseSalary?: number;
+  leavesRemaining?: number;
+  casualLeavesUsed?: number;
+  casualLeavesTotal?: number;
+  sickLeavesUsed?: number;
+  sickLeavesTotal?: number;
+  date_of_birth?: string;
+  joiningDate?: string;
+  pfApplicable?: boolean;
 }
 
 interface AuthContextType {
   user: User | null;
-  sessionToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
-  register: (data: any) => Promise<any>;
+  login: () => Promise<void>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -41,124 +41,117 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const oidcAuth = useOIDCAuth();
+  const [user, setUser] = useState<User | null>(() => {
+    // Try to load user from localStorage on initial render
+    const savedUser = localStorage.getItem('user');
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
   const [isLoading, setIsLoading] = useState(true);
 
-  // Get API base URL from environment
-  const API_BASE = import.meta.env.VITE_API_BASE || '';
-
-  // Check for existing session on mount
-  useEffect(() => {
-    const token = localStorage.getItem('sessionToken');
-    const savedUser = localStorage.getItem('user');
-    
-    if (token && savedUser) {
-      setSessionToken(token);
-      setUser(JSON.parse(savedUser));
-    }
-    setIsLoading(false);
-  }, []);
-
-  const login = async (email: string, password: string) => {
-    setIsLoading(true);
+  // Sync user data from Cognito to your backend
+  const syncUserWithBackend = async () => {
     try {
-      console.log('📤 Attempting login to:', `${API_BASE}/auth`);
-      console.log('📧 Email:', email);
-      
-      const response = await fetch(`${API_BASE}/auth`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({
-          action: 'login',
-          company_email: email,
-          password: password
-        })
-      });
+      // When user logs in via Cognito, get their profile from your backend
+      const profile = await getMyProfile();
+      if (profile) {
+        setUser(profile);
+        localStorage.setItem('user', JSON.stringify(profile));
+      } else {
+        // If no profile, clear user
+        setUser(null);
+        localStorage.removeItem('user');
+      }
+    } catch (error) {
+      console.error('Error syncing user with backend:', error);
+      setUser(null);
+      localStorage.removeItem('user');
+    }
+  };
 
-      console.log('📥 Login response status:', response.status);
+  // Handle OIDC auth state changes
+  useEffect(() => {
+    const checkAuth = async () => {
+      setIsLoading(true);
       
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('❌ Login failed:', errorData);
-        throw new Error(errorData.error || `Login failed: ${response.status}`);
+      if (oidcAuth.isLoading) {
+        return;
       }
 
-      const data = await response.json();
-      console.log('✅ Login success:', data);
+      console.log('OIDC Auth State:', {
+        isAuthenticated: oidcAuth.isAuthenticated,
+        user: oidcAuth.user,
+        error: oidcAuth.error
+      });
+
+      // If there's an OIDC error, clear everything
+      if (oidcAuth.error) {
+        console.error('OIDC Auth Error:', oidcAuth.error);
+        setUser(null);
+        localStorage.removeItem('user');
+        setIsLoading(false);
+        return;
+      }
+
+      if (oidcAuth.isAuthenticated && oidcAuth.user) {
+        try {
+          // User is authenticated via Cognito
+          console.log('User authenticated via Cognito:', oidcAuth.user.profile.email);
+          await syncUserWithBackend();
+        } catch (error) {
+          console.error('Authentication error:', error);
+          setUser(null);
+          localStorage.removeItem('user');
+        }
+      } else {
+        // User is not authenticated
+        setUser(null);
+        localStorage.removeItem('user');
+      }
       
-      setUser(data.employee);
-      setSessionToken(data.sessionToken);
-      localStorage.setItem('sessionToken', data.sessionToken);
-      localStorage.setItem('user', JSON.stringify(data.employee));
-      
-    } catch (error) {
-      console.error('❌ Login error:', error);
-      throw error;
-    } finally {
       setIsLoading(false);
+    };
+
+    checkAuth();
+  }, [oidcAuth.isLoading, oidcAuth.isAuthenticated, oidcAuth.user, oidcAuth.error]);
+
+  const login = async () => {
+    try {
+      await oidcAuth.signinRedirect();
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
     }
   };
 
   const logout = async () => {
-    if (sessionToken) {
-      try {
-        await fetch(`${API_BASE}/auth`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'logout', sessionToken })
-        });
-      } catch (error) {
-        console.error('Logout error:', error);
-      }
+    setUser(null);
+    localStorage.removeItem('user');
+    
+    // Use Cognito logout URL
+    const clientId = "3dpb9telsc7meq8hv8bt8in391";
+    const logoutUri = "http://localhost:5173/login";
+    const cognitoDomain = "https://us-east-1cztj6inyo.auth.us-east-1.amazoncognito.com";
+    
+    // Clear Cognito session
+    if (oidcAuth.user) {
+      await oidcAuth.removeUser();
     }
     
-    setUser(null);
-    setSessionToken(null);
-    localStorage.removeItem('sessionToken');
-    localStorage.removeItem('user');
-    window.location.href = '/login';
+    // Redirect to Cognito logout
+    window.location.href = `${cognitoDomain}/logout?client_id=${clientId}&logout_uri=${encodeURIComponent(logoutUri)}`;
   };
 
-  const register = async (data: any) => {
-    console.log('📤 Registering:', `${API_BASE}/auth`);
-    console.log('📝 Data:', data);
-    
-    const response = await fetch(`${API_BASE}/auth`, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify({ action: 'register', ...data })
-    });
-
-    console.log('📥 Register response status:', response.status);
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ Register error:', errorText);
-      throw new Error(errorText || 'Registration failed');
-    }
-
-    return response.json();
+  const value: AuthContextType = {
+    user,
+    isAuthenticated: !!user,
+    isLoading: oidcAuth.isLoading || isLoading,
+    login,
+    logout,
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        sessionToken,
-        isAuthenticated: !!user,
-        isLoading,
-        login,
-        logout,
-        register
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
